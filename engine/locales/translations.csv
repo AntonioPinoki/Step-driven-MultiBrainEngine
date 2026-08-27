@@ -1,0 +1,127 @@
+key,scope,property,description,en,ja
+nav.dashboard,global,label,Main navigation tab,Dashboard,ダッシュボード
+nav.providers,global,label,Main navigation tab,Providers,プロバイダー
+nav.prompt_studio,global,label,Main navigation tab,Prompt Studio,プロンプトスタジオ
+nav.lorebooks,global,label,Main navigation tab,Lorebooks,ロアブック
+nav.prompt_assistant,global,label,Main navigation tab,Prompt Assistant,プロンプトアシスタント
+common.language,global,label,Language selector,Language,言語
+common.apply,global,button,Apply pending changes,Apply,適用
+common.save,global,button,Save changes,Save,保存
+common.cancel,global,button,Cancel an operation,Cancel,キャンセル
+common.add,global,button,Add an item,Add,追加
+common.delete,global,button,Delete an item,Delete,削除
+common.import,global,button,Import data,Import,インポート
+common.export,global,button,Export data,Export,エクスポート
+common.refresh,global,button,Refresh displayed data,Refresh,更新
+common.clear,global,button,Clear displayed data,Clear,クリア
+common.enabled,global,label,Enabled state,Enabled,有効
+common.name,global,label,Name field,Name,名前
+common.title,global,label,Title field,Title,タイトル
+common.prompt,global,label,Prompt field,Prompt,プロンプト
+common.content,global,label,Content field,Content,内容
+common.error,global,status,Generic error heading,Error,エラー
+common.saved,global,status,Generic save completion,Saved.,保存しました。
+common.no_selection,global,status,No item is selected,Nothing selected,選択されていません
+common.unsaved_changes,global,status,Unsaved edit warning,You have unsaved changes.,未保存の変更があります。
+common.not_configured,global,status,Configuration value is absent,Not configured,未設定
+dashboard.server_status,dashboard,label,Server status heading,Server status,サーバー状態
+dashboard.running,dashboard,status,Server is running,Running,稼働中
+dashboard.stopped,dashboard,status,Server is stopped,Stopped,停止中
+dashboard.multibrain_api,dashboard,label,API endpoint exposed by this application,MultiBrain API,MultiBrain API
+dashboard.main_provider_api,dashboard,label,Main provider endpoint,Main provider API,メインプロバイダーAPI
+dashboard.background_provider_api,dashboard,label,Background provider endpoint,Background provider API,バックグラウンドプロバイダーAPI
+dashboard.web_ui_note,dashboard,help,Relationship between web UI and compatible API,The web control surface operates independently from the OpenAI-compatible API.,Webコントロール画面はOpenAI互換APIとは独立して動作します。
+provider.main_provider,providers,label,Primary generation provider,Main provider,メインプロバイダー
+provider.background_provider,providers,label,Background processing provider,Background provider,バックグラウンドプロバイダー
+provider.base_url,providers,label,Provider API base URL,Base URL,ベースURL
+provider.api_key,providers,label,Provider credential,API key,APIキー
+provider.model,providers,label,Provider model name,Model,モデル
+provider.test_connection,providers,button,Test provider connectivity,Test connection,接続テスト
+provider.connection_ok,providers,status,Connection test succeeded,Connection successful.,接続に成功しました。
+provider.connection_failed,providers,error,Connection test failed with inserted error,Connection failed: {error},接続に失敗しました: {error}
+provider.save_settings,providers,button,Save provider settings,Save provider settings,プロバイダー設定を保存
+provider.environment_managed,providers,status,Value is controlled by environment variable,Managed by environment variable,環境変数で管理されています
+prompt_studio.help,prompt_studio,help,Prompt Studio overview,Configure up to 23 reasoning steps and final output prompts.,最大23個の推論ステップと最終出力プロンプトを設定します。
+prompt_studio.saved_presets,prompt_studio,label,Saved preset selector,Saved presets,保存済みプリセット
+prompt_studio.preset_name,prompt_studio,label,Preset name input,Preset name,プリセット名
+prompt_studio.save_preset,prompt_studio,button,Save a named preset,Save preset,プリセットを保存
+prompt_studio.export_csv,prompt_studio,button,Export preset as CSV,Export CSV,CSVを書き出す
+prompt_studio.import_csv,prompt_studio,label,Import preset CSV,Import CSV,CSVを読み込む
+prompt_studio.debug_traces,prompt_studio,label,Debug trace recording toggle,Debug traces,デバッグ記録
+prompt_studio.save_settings,prompt_studio,button,Apply active Prompt Studio configuration,Save settings,設定を保存
+prompt_studio.exported_preset,prompt_studio,label,Generated preset download,Exported preset,書き出したプリセット
+prompt_studio.reasoning_steps,prompt_studio,label,Reasoning step section,Reasoning steps,推論ステップ
+prompt_studio.summarization,prompt_studio,label,Summarization prompt tab,Summarization,要約
+prompt_studio.group_chat,prompt_studio,label,Group chat prompt tab,Group chat,グループチャット
+prompt_studio.group_prompt,prompt_studio,label,Group chat prompt input,Group prompt,グループ用プロンプト
+prompt_studio.temperature,prompt_studio,label,Sampling temperature,Temperature,温度
+prompt_studio.frequency_penalty,prompt_studio,label,Frequency penalty sampler,Frequency penalty,頻度ペナルティ
+prompt_studio.presence_penalty,prompt_studio,label,Presence penalty sampler,Presence penalty,存在ペナルティ
+prompt_studio.repetition_penalty,prompt_studio,label,Repetition penalty sampler,Repetition penalty,反復ペナルティ
+prompt_studio.repetition_range,prompt_studio,label,Repetition lookback range,Repetition range,反復範囲
+prompt_studio.add_step,prompt_studio,button,Add a reasoning step,Add reasoning step,推論ステップを追加
+prompt_studio.delete_step,prompt_studio,button,Delete a reasoning step,Delete step,ステップを削除
+prompt_studio.saved_status,prompt_studio,status,Active configuration saved,Saved Prompt Studio settings.,プロンプトスタジオの設定を保存しました。
+prompt_studio.preset_saved_status,prompt_studio,status,Named preset saved,Preset saved.,プリセットを保存しました。
+prompt_studio.imported_status,prompt_studio,status,Preset CSV imported,Preset imported.,プリセットを読み込みました。
+prompt_studio.export_failed,prompt_studio,error,Preset export failed,Could not export the preset: {error},プリセットを書き出せませんでした: {error}
+lorebook.global_settings,lorebooks,label,Global lorebook settings,Global settings,全体設定
+lorebook.scan_depth,lorebooks,label,Global scan depth,Scan depth,スキャン深度
+lorebook.token_budget,lorebooks,label,Token budget per agent,Token budget / agent,エージェントごとのトークン上限
+lorebook.case_sensitive,lorebooks,label,Case-sensitive key matching,Case sensitive,大文字・小文字を区別
+lorebook.whole_words,lorebooks,label,Whole-word key matching,Whole words,単語全体で一致
+lorebook.recursive,lorebooks,label,Recursive lore matching,Recursive,再帰検索
+lorebook.book,lorebooks,label,Lorebook selector,Lorebook,ロアブック
+lorebook.add_book,lorebooks,button,Add lorebook,Add book,ロアブックを追加
+lorebook.delete_book,lorebooks,button,Delete lorebook,Delete book,ロアブックを削除
+lorebook.import_st_json,lorebooks,button,Import SillyTavern lorebook JSON,Import ST JSON,ST JSONを読み込む
+lorebook.book_title,lorebooks,label,Lorebook title input,Lorebook title,ロアブック名
+lorebook.entry,lorebooks,label,Entry selector,Entry,エントリー
+lorebook.add_entry,lorebooks,button,Add lorebook entry,Add entry,エントリーを追加
+lorebook.delete_entry,lorebooks,button,Delete lorebook entry,Delete entry,エントリーを削除
+lorebook.entry_title,lorebooks,label,Entry title input,Entry title,エントリー名
+lorebook.primary_keys,lorebooks,label,Primary activation keys,Primary keys,プライマリキー
+lorebook.secondary_keys,lorebooks,label,Secondary activation keys,Secondary keys,セカンダリキー
+lorebook.comma_separated,lorebooks,placeholder,Key list input format,Comma separated,カンマ区切り
+lorebook.always_active,lorebooks,label,Always-active entry toggle,Always active,常時有効
+lorebook.use_secondary_keys,lorebooks,label,Use secondary activation keys,Use secondary keys,セカンダリキーを使用
+lorebook.use_probability,lorebooks,label,Use activation probability,Use probability,確率を使用
+lorebook.order,lorebooks,label,Insertion order,Order,順序
+lorebook.probability,lorebooks,label,Activation probability,Probability,発動確率
+lorebook.entry_scan_depth,lorebooks,label,Per-entry scan depth,Entry scan depth,個別スキャン深度
+lorebook.update_draft,lorebooks,button,Write editor fields into draft,Update draft,編集中データへ反映
+lorebook.agent_assignments,lorebooks,label,Agent assignment section,Agent assignments,エージェントへの割り当て
+lorebook.agent,lorebooks,label,Agent selector,Agent,エージェント
+lorebook.assigned_books,lorebooks,label,Lorebooks assigned to agent,Assigned lorebooks,割り当てるロアブック
+lorebook.update_assignment,lorebooks,button,Update agent assignment,Update assignment,割り当てを更新
+lorebook.apply_settings,lorebooks,button,Save lorebook configuration,Apply lorebooks,ロアブック設定を保存
+lorebook.loaded_status,lorebooks,status,Lorebook configuration loaded,Lorebooks loaded.,ロアブック設定を読み込みました。
+lorebook.draft_updated_status,lorebooks,status,Current editor draft updated,Draft updated.,編集中データへ反映しました。
+lorebook.book_added_status,lorebooks,status,Lorebook added,Lorebook added.,ロアブックを追加しました。
+lorebook.book_deleted_status,lorebooks,status,Lorebook deleted,Lorebook deleted.,ロアブックを削除しました。
+lorebook.entry_added_status,lorebooks,status,Entry added,Entry added.,エントリーを追加しました。
+lorebook.entry_deleted_status,lorebooks,status,Entry deleted,Entry deleted.,エントリーを削除しました。
+lorebook.assignment_updated_status,lorebooks,status,Agent assignment updated,Assignment updated.,割り当てを更新しました。
+lorebook.import_complete_status,lorebooks,status,SillyTavern JSON import completed,Import completed.,読み込みが完了しました。
+lorebook.import_failed,lorebooks,error,SillyTavern JSON import failed,Import failed: {error},読み込みに失敗しました: {error}
+prompt_assistant.temporary_orders,prompt_assistant,label,Temporary order section,Temporary orders,一時指示
+prompt_assistant.agent,prompt_assistant,label,Agent selector,Agent,エージェント
+prompt_assistant.order,prompt_assistant,label,Temporary order input,Order,追加指示
+prompt_assistant.apply_order,prompt_assistant,button,Apply temporary order,Apply order,指示を反映
+prompt_assistant.clear_order,prompt_assistant,button,Clear temporary order,Clear order,指示を消去
+prompt_assistant.message,prompt_assistant,label,Chat message input,Message,メッセージ
+prompt_assistant.message_placeholder,prompt_assistant,placeholder,Chat message placeholder,Type a message...,メッセージを入力…
+prompt_assistant.send,prompt_assistant,button,Send chat message,Send,送信
+prompt_assistant.temperature,prompt_assistant,label,Assistant sampling temperature,Temperature,温度
+prompt_assistant.max_tokens,prompt_assistant,label,Assistant maximum output tokens,Max tokens,最大トークン数
+prompt_assistant.clear_chat,prompt_assistant,button,Clear assistant chat,Clear chat,チャットを消去
+prompt_assistant.agents_available,prompt_assistant,status,Available agent count,{count} agents available,利用可能なエージェント: {count}
+prompt_assistant.no_agent_selected,prompt_assistant,status,No agent selected for an order,Select an agent first.,先にエージェントを選択してください。
+prompt_assistant.order_applied,prompt_assistant,status,Temporary order applied,Order applied.,指示を反映しました。
+prompt_assistant.order_cleared,prompt_assistant,status,Temporary order cleared,Order cleared.,指示を消去しました。
+prompt_assistant.empty_message,prompt_assistant,status,Empty message validation,Enter a message.,メッセージを入力してください。
+prompt_assistant.greeting.intro,prompt_assistant,message,Initial assistant greeting introduction,Welcome to BrainEngine. This assistant helps you inspect the current reasoning chain and refine prompts.,BrainEngineへようこそ。このアシスタントでは、現在の思考チェーンを確認し、プロンプトを調整できます。
+prompt_assistant.greeting.orders,prompt_assistant,message,Initial assistant greeting order guidance,"Use Temporary orders when you want to give a specific agent an additional instruction for this session.",特定のエージェントへこのセッション中だけ追加指示を与えたい場合は、一時指示を使用してください。
+prompt_assistant.greeting.agents_heading,prompt_assistant,message,Initial assistant greeting agent list heading,Available agents:,利用可能なエージェント:
+prompt_assistant.greeting.agents_loading,prompt_assistant,message,Initial assistant greeting shown while agents load,Loading agent information...,エージェント情報を読み込んでいます…
+prompt_assistant.greeting.closing,prompt_assistant,message,Initial assistant greeting closing,Send a message to begin.,メッセージを送信して開始してください。

@@ -1,0 +1,4 @@
+fastapi
+uvicorn
+openai
+gradio==6.25.0
