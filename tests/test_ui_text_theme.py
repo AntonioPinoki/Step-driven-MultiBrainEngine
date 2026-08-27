@@ -25,6 +25,10 @@ class UiTextTests(unittest.TestCase):
     def test_all_locales_have_the_same_fixed_ui_keys(self):
         self.assertEqual(set(UI_TEXT["ja"]), set(UI_TEXT["en"]))
 
+    def test_project_name_is_consistent_across_locales(self):
+        for locale in UI_TEXT:
+            self.assertEqual(UI_TEXT[locale]["app_title"], "Step-driven MultiBrainEngine")
+
     def test_unknown_key_is_visible_instead_of_raising(self):
         self.assertEqual(t("missing.translation", "ja"), "missing.translation")
 

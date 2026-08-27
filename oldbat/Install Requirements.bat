@@ -1,5 +1,5 @@
 @echo off
-title MultiAgent BrainEngine 2 - Install
+title Step-driven MultiBrainEngine - Install
 cd /d "%~dp0"
 where python >nul 2>nul
 if errorlevel 1 (
@@ -9,7 +9,7 @@ if errorlevel 1 (
     exit /b 1
 )
 echo ============================================================
-echo   MultiAgent BrainEngine 2 - installing required packages
+echo   Step-driven MultiBrainEngine - installing required packages
 echo ============================================================
 echo.
 python -m pip install -r engine\requirements.txt

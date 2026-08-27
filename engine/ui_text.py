@@ -83,7 +83,7 @@ def _load_catalog():
                 value = row.get(fallback) or ""
             catalog[code][key] = value or row.get("en") or key
     for code in catalog:
-        catalog[code].update(app_title="MultiAgent BrainEngine", writer="Writer", step="Step")
+        catalog[code].update(app_title="Step-driven MultiBrainEngine", writer="Writer", step="Step")
         for alias, canonical in KEY_ALIASES.items():
             catalog[code][alias] = catalog[code].get(canonical, canonical)
     return languages, catalog

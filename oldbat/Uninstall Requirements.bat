@@ -1,5 +1,5 @@
 @echo off
-title MultiAgent BrainEngine 2 - Uninstall
+title Step-driven MultiBrainEngine - Uninstall
 cd /d "%~dp0"
 where python >nul 2>nul
 if errorlevel 1 (
@@ -8,7 +8,7 @@ if errorlevel 1 (
     exit /b 1
 )
 echo ============================================================
-echo   MultiAgent BrainEngine 2 - removing its packages
+echo   Step-driven MultiBrainEngine - removing its packages
 echo ============================================================
 echo.
 echo Removing: fastapi, uvicorn, openai

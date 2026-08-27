@@ -1,4 +1,4 @@
-# MultiAgent BrainEngine
+# Step-driven MultiBrainEngine
 
 SillyTavernとOpenAI互換LLMの間で動作する、6エージェント構成のロールプレイ用プロキシです。
 

@@ -1,7 +1,7 @@
 # SillyTavern extensions
 
 This directory contains a snapshot of the extension functionality used with
-MultiAgent BrainEngine.  The SillyTavern application itself is intentionally
+Step-driven MultiBrainEngine.  The SillyTavern application itself is intentionally
 not included in this repository.
 
 ## Install

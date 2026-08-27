@@ -120,7 +120,7 @@ prompt_assistant.no_agent_selected,prompt_assistant,status,No agent selected for
 prompt_assistant.order_applied,prompt_assistant,status,Temporary order applied,Order applied.,指示を反映しました。
 prompt_assistant.order_cleared,prompt_assistant,status,Temporary order cleared,Order cleared.,指示を消去しました。
 prompt_assistant.empty_message,prompt_assistant,status,Empty message validation,Enter a message.,メッセージを入力してください。
-prompt_assistant.greeting.intro,prompt_assistant,message,Initial assistant greeting introduction,Welcome to BrainEngine. This assistant helps you inspect the current reasoning chain and refine prompts.,BrainEngineへようこそ。このアシスタントでは、現在の思考チェーンを確認し、プロンプトを調整できます。
+prompt_assistant.greeting.intro,prompt_assistant,message,Initial assistant greeting introduction,Welcome to Step-driven MultiBrainEngine. This assistant helps you inspect the current reasoning chain and refine prompts.,Step-driven MultiBrainEngineへようこそ。このアシスタントでは、現在の思考チェーンを確認し、プロンプトを調整できます。
 prompt_assistant.greeting.orders,prompt_assistant,message,Initial assistant greeting order guidance,"Use Temporary orders when you want to give a specific agent an additional instruction for this session.",特定のエージェントへこのセッション中だけ追加指示を与えたい場合は、一時指示を使用してください。
 prompt_assistant.greeting.agents_heading,prompt_assistant,message,Initial assistant greeting agent list heading,Available agents:,利用可能なエージェント:
 prompt_assistant.greeting.agents_loading,prompt_assistant,message,Initial assistant greeting shown while agents load,Loading agent information...,エージェント情報を読み込んでいます…

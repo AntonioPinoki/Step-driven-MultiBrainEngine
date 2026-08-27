@@ -1,5 +1,5 @@
 # --- START OF FILE launcher.py ---
-# MultiAgent BrainEngine 2 — launcher.
+# Step-driven MultiBrainEngine — launcher.
 # Opens the setup window. Press Continue and your settings are saved to
 # engine/config.json, then the server starts in this same console window.
 # Press Cancel (or close the window) and nothing starts.
@@ -81,7 +81,7 @@ WARN_BD = "#5c4522"
 class Launcher(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("MultiAgent BrainEngine 2 — Setup")
+        self.title("Step-driven MultiBrainEngine — Setup")
         self.geometry("600x720")
         self.configure(bg=BG)
         self.resizable(False, False)
@@ -91,7 +91,7 @@ class Launcher(tk.Tk):
         main = cfg.get("main") or {}
         logic = cfg.get("logic") or {}
 
-        tk.Label(self, text="MultiAgent BrainEngine 2", bg=BG, fg=AMBER,
+        tk.Label(self, text="Step-driven MultiBrainEngine", bg=BG, fg=AMBER,
                  font=FONT_T, anchor="w").pack(fill="x", padx=24, pady=(20, 2))
         tk.Label(self, text="Check your API settings, then press Continue to start the server.",
                  bg=BG, fg=MUTED, font=FONT, anchor="w").pack(fill="x", padx=24, pady=(0, 14))
@@ -1938,7 +1938,7 @@ class ControlWindow(tk.Tk):
 
     def __init__(self):
         super().__init__()
-        self.title("MultiAgent BrainEngine 2 — Control")
+        self.title("Step-driven MultiBrainEngine — Control")
         self.geometry("920x700")
         self.minsize(700, 480)
         self.configure(bg=BG)
@@ -2003,7 +2003,7 @@ class ControlWindow(tk.Tk):
 
         title_row = tk.Frame(header, bg=BG)
         title_row.pack(fill="x")
-        tk.Label(title_row, text="MultiAgent BrainEngine 2", bg=BG, fg=AMBER,
+        tk.Label(title_row, text="Step-driven MultiBrainEngine", bg=BG, fg=AMBER,
                  font=FONT_T, anchor="w").pack(side="left")
         self.status = tk.Label(title_row, text="● STARTING", bg=BG, fg=AMBER,
                                font=FONT_S, anchor="e")
@@ -2108,7 +2108,7 @@ class ControlWindow(tk.Tk):
 
         print()
         print("=" * 62)
-        print("  MultiAgent BrainEngine 2")
+        print("  Step-driven MultiBrainEngine")
         print(f"  SillyTavern address : {SERVER_URL}")
         print(f"  Prompt Studio       : http://127.0.0.1:{PORT}/prompts")
         print("  Stop the server from the control window")

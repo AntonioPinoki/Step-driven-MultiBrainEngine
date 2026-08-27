@@ -1,5 +1,5 @@
 @echo off
-title MultiAgent BrainEngine 2
+title Step-driven MultiBrainEngine
 cd /d "%~dp0"
 where python >nul 2>nul
 if errorlevel 1 (

@@ -128,7 +128,7 @@ def create_ui(server: Any, language: str = "ja"):
         finally:
             await stream.close()
 
-    with gr.Blocks(title="MultiAgent BrainEngine") as demo:
+    with gr.Blocks(title="Step-driven MultiBrainEngine") as demo:
         gr.Markdown(f"# {tr('app_title')}", elem_classes="brain-header")
         with gr.Tabs():
             with gr.Tab(tr("dashboard")):

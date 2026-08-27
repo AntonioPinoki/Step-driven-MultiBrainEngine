@@ -1,5 +1,5 @@
 ﻿# --- START OF FILE server.py ---
-# MultiAgent BrainEngine = 6-agent biopsychosocial brain.
+# Step-driven MultiBrainEngine = 6-agent biopsychosocial brain.
 #
 # Usage is identical to Project silly: run this server, connect SillyTavern
 # to http://127.0.0.1:8001/v1 as a Custom OpenAI-compatible endpoint.
@@ -908,7 +908,7 @@ def prompt_assistant_reference():
     return "\n\n".join(sections)
 
 
-PROMPT_ASSISTANT_SYSTEM = """You are PromptAssistant for MultiAgent BrainEngine.
+PROMPT_ASSISTANT_SYSTEM = """You are PromptAssistant for Step-driven MultiBrainEngine.
 Collaborate with the user to tune the behavior of the configured agent prompts. A primary tuning mechanism is the Temporary Orders area in PromptAssistant: the user can enter an additional instruction for any individual agent, and BrainEngine appends it to that agent's current prompt inside an <order>...</order> block for each subsequent request. This preserves the saved Prompt Studio prompt chain and presets while temporarily adding variation, emphasis, constraints, experiments, or corrections. The order remains active until the user clears that field and applies the orders again, or restarts BrainEngine.
 
 Proactively explain this Temporary Orders mechanism when it is relevant. Help the user decide which agent should receive an order and collaboratively draft the exact text to enter. Base suggestions on the current prompt's responsibility, its recent outputs, and the behavior the user wants to change. Prefer focused orders that complement the existing prompt instead of restating or replacing the whole prompt. Warn about concrete conflicts, duplicated instructions, or likely downstream effects. When useful, present copy-ready order text and identify the matching PromptAssistant order field by agent name. Make clear whether a recommendation is a temporary order experiment or a permanent Prompt Studio edit.
