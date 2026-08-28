@@ -91,11 +91,16 @@ lorebook.probability,lorebooks,label,Activation probability,Probability,発動�
 lorebook.entry_scan_depth,lorebooks,label,Per-entry scan depth,Entry scan depth,個別スキャン深度
 lorebook.update_draft,lorebooks,button,Write editor fields into draft,Update draft,編集中データへ反映
 lorebook.agent_assignments,lorebooks,label,Agent assignment section,Agent assignments,エージェントへの割り当て
+lorebook.assignment_help,lorebooks,help,Agent assignment instructions,Use the dropdown on the right of each active Prompt Studio agent to select lorebooks. Changes are saved with the button below.,プロンプトスタジオで有効な各エージェントの右側にあるプルダウンからロアブックを選択してください。変更は下のボタンで保存されます。
+lorebook.available_books,lorebooks,label,Available lorebooks dropdown,Available lorebooks,選択可能なロアブック
+lorebook.active_books,lorebooks,label,Currently active lorebook list,Currently applied,現在適用中
+lorebook.none_assigned,lorebooks,status,No lorebooks assigned,None,なし
 lorebook.agent,lorebooks,label,Agent selector,Agent,エージェント
 lorebook.assigned_books,lorebooks,label,Lorebooks assigned to agent,Assigned lorebooks,割り当てるロアブック
 lorebook.update_assignment,lorebooks,button,Update agent assignment,Update assignment,割り当てを更新
 lorebook.apply_settings,lorebooks,button,Save lorebook configuration,Apply lorebooks,ロアブック設定を保存
 lorebook.loaded_status,lorebooks,status,Lorebook configuration loaded,Lorebooks loaded.,ロアブック設定を読み込みました。
+lorebook.saved_status,lorebooks,status,Lorebook configuration saved,Lorebooks saved.,ロアブック設定を保存しました。
 lorebook.draft_updated_status,lorebooks,status,Current editor draft updated,Draft updated.,編集中データへ反映しました。
 lorebook.book_added_status,lorebooks,status,Lorebook added,Lorebook added.,ロアブックを追加しました。
 lorebook.book_deleted_status,lorebooks,status,Lorebook deleted,Lorebook deleted.,ロアブックを削除しました。

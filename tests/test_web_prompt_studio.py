@@ -44,6 +44,21 @@ class PromptStudioFormTests(unittest.TestCase):
         self.assertNotIn(2, choices[2])
         self.assertNotIn(5, choices[2])
 
+    def test_step_ui_state_keeps_deleted_slot_hidden_when_refreshed(self):
+        visible, numbers, choices = web_prompt_studio.step_ui_state(
+            [True, False, True], [1, 2, 3])
+        self.assertEqual(visible, [True, False, True])
+        self.assertEqual(numbers, [1, 2, 3])
+        self.assertNotIn(1, choices[1])
+        self.assertNotIn(3, choices[1])
+
+    def test_step_ui_state_normalizes_empty_numbers(self):
+        visible, numbers, choices = web_prompt_studio.step_ui_state(
+            [False, True], [None, 2])
+        self.assertEqual(visible, [False, True])
+        self.assertEqual(numbers, [1, 2])
+        self.assertIn(1, choices[0])
+
     def test_callbacks_save_uses_prompt_store(self):
         callbacks = web_prompt_studio.PromptStudioCallbacks([], WRITER, SUMMARY)
         values = web_prompt_studio.config_to_form(self.config())

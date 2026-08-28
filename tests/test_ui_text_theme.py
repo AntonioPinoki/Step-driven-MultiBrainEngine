@@ -70,6 +70,9 @@ class UiThemeTests(unittest.TestCase):
         self.assertIn("min-height: 0 !important", CUSTOM_CSS)
         self.assertIn("width: calc(100vw - 2rem) !important", CUSTOM_CSS)
         self.assertIn('[role="tabpanel"]', CUSTOM_CSS)
+        self.assertIn(".brain-lorebook-assignment-scroll", CUSTOM_CSS)
+        self.assertIn(".brain-lorebook-agent-info", CUSTOM_CSS)
+        self.assertIn("overflow-wrap: anywhere", CUSTOM_CSS)
 
 
 if __name__ == "__main__":

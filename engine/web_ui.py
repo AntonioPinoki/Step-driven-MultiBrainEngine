@@ -161,7 +161,7 @@ def create_ui(server: Any, language: str = "ja"):
                     logic_test_status = gr.Markdown()
                 provider_save = gr.Button(tr("save"), variant="primary")
 
-            with gr.Tab(tr("prompt_studio")):
+            with gr.Tab(tr("prompt_studio")) as prompt_tab:
                 prompt_ui = build_prompt_studio(
                     server.DEFAULT_REASONING_STEPS, server.DEFAULT_WRITER, server.DEFAULT_SUMMARY,
                     get_debug=lambda: server.DEBUG_MODE,
@@ -169,7 +169,7 @@ def create_ui(server: Any, language: str = "ja"):
                     i18n=tr,
                 )
 
-            with gr.Tab(tr("lorebooks")):
+            with gr.Tab(tr("lorebooks")) as lore_tab:
                 lore_ui = build_lorebooks(
                     gr, load_config=lore_config, save_config=save_lore_config,
                     import_book=lorebook_store.import_sillytavern, i18n=tr,
@@ -187,11 +187,36 @@ def create_ui(server: Any, language: str = "ja"):
              logic_key, server_status, multibrain_api, main_provider_api,
              logic_provider_api],
         )
+        prompt_load_event = demo.load(
+            prompt_ui.callbacks.load, None, prompt_ui.form_outputs,
+        )
+        prompt_load_event.then(
+            prompt_ui.refresh_step_ui,
+            prompt_ui.step_state_inputs,
+            prompt_ui.step_ui_outputs,
+            show_progress="hidden",
+        )
+        prompt_tab.select(
+            prompt_ui.refresh_step_ui,
+            prompt_ui.step_state_inputs,
+            prompt_ui.step_ui_outputs,
+            show_progress="hidden",
+        )
         demo.load(lore_ui["load"], None, lore_ui["load_outputs"])
+        lore_tab.select(
+            lore_ui["refresh"], lore_ui["refresh_inputs"],
+            lore_ui["assignment_outputs"], show_progress="hidden",
+        )
         demo.load(assistant_ui["load"], None, assistant_ui["load_outputs"])
         prompt_ui.save_event.then(
             assistant_ui["refresh"], assistant_ui["refresh_inputs"],
             assistant_ui["load_outputs"], show_progress="hidden",
+        )
+        prompt_ui.save_event.then(
+            prompt_ui.refresh_step_ui,
+            prompt_ui.step_state_inputs,
+            prompt_ui.step_ui_outputs,
+            show_progress="hidden",
         )
         main_test.click(test_connection, [main_url, main_key], main_test_status)
         logic_test.click(test_connection, [logic_url, logic_key], logic_test_status)

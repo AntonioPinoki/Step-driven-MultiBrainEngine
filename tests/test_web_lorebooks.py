@@ -4,7 +4,9 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "engine"))
 
-from web_lorebooks import add_book, add_entry, delete_book, update_entry
+from web_lorebooks import (
+    add_book, add_entry, assigned_book_names, delete_book, update_assignments, update_entry,
+)
 
 
 def base_draft():
@@ -30,3 +32,40 @@ class WebLorebookTests(unittest.TestCase):
         self.assertEqual(updated["books"], [])
         self.assertNotIn("step1", updated["assignments"])
         self.assertEqual(updated["assignments"]["writer"], ["other"])
+
+    def test_updates_all_visible_agent_assignments_at_once(self):
+        draft = {
+            "books": [{"id": "world", "name": "World", "entries": []},
+                      {"id": "cast", "name": "Cast", "entries": []}],
+            "assignments": {"old": ["world"]},
+            "settings": {},
+        }
+        updated = update_assignments(
+            draft,
+            ["step1", "step2", "writer", None],
+            [["world", "world", "missing"], [], ["cast", "world"], ["world"]],
+        )
+        self.assertEqual(updated["assignments"], {
+            "step1": ["world"],
+            "writer": ["cast", "world"],
+        })
+        self.assertEqual(draft["assignments"], {"old": ["world"]})
+
+    def test_summary_is_never_assigned(self):
+        draft = {
+            "books": [{"id": "world", "name": "World", "entries": []}],
+            "assignments": {},
+            "settings": {},
+        }
+        updated = update_assignments(draft, ["summary", "writer"], [["world"], ["world"]])
+        self.assertEqual(updated["assignments"], {"writer": ["world"]})
+
+    def test_assigned_book_names_preserve_selection_order_and_skip_missing_books(self):
+        draft = {
+            "books": [{"id": "world", "name": "World", "entries": []},
+                      {"id": "cast", "name": "Cast", "entries": []}],
+        }
+        self.assertEqual(
+            assigned_book_names(draft, ["cast", "missing", "world"]),
+            ["Cast", "World"],
+        )

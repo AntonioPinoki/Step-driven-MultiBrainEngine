@@ -110,6 +110,14 @@ def step_number_choices(enabled_values: Iterable[Any], number_values: Iterable[A
     ]
 
 
+def step_ui_state(enabled_values: Iterable[Any], number_values: Iterable[Any]):
+    """Return the visibility and number choices for every fixed step slot."""
+    enabled = [bool(value) for value in enabled_values]
+    numbers = [int(value) if value not in (None, "") else index + 1
+               for index, value in enumerate(number_values)]
+    return enabled, numbers, step_number_choices(enabled, numbers)
+
+
 @dataclass(frozen=True)
 class PresetDropdownState:
     """Gradio-neutral description of a saved-preset dropdown update."""
@@ -209,6 +217,9 @@ class PromptStudioUI:
     preset: Any
     debug: Any
     save_event: Any
+    refresh_step_ui: Callable[..., list[Any]]
+    step_state_inputs: list[Any]
+    step_ui_outputs: list[Any]
 
 
 def _sampling_controls(gr: Any, prefix: str, values: Iterable[Any], tr=lambda key: key) -> list[Any]:
@@ -334,12 +345,11 @@ def build_prompt_studio(
         return message, preset_dropdown_update(state), *form_values
 
     def refresh_step_ui(*step_values):
-        enabled_values = step_values[:MAX_STEPS]
-        number_values = step_values[MAX_STEPS:]
-        choices = step_number_choices(enabled_values, number_values)
-        containers = [gr.update(visible=bool(active)) for active in enabled_values]
+        enabled_values, number_values, choices = step_ui_state(
+            step_values[:MAX_STEPS], step_values[MAX_STEPS:])
+        containers = [gr.update(visible=active) for active in enabled_values]
         dropdowns = [
-            gr.update(choices=slot_choices, value=int(current))
+            gr.update(choices=slot_choices, value=current)
             for slot_choices, current in zip(choices, number_values)
         ]
         return [*containers, *dropdowns]
@@ -412,4 +422,6 @@ def build_prompt_studio(
         callbacks.export_preset, inputs=[preset_name, *form], outputs=[status, export_file])
     debug.change(callbacks.toggle_debug, inputs=debug, outputs=[debug, status])
     return PromptStudioUI(
-        callbacks, form, form_outputs, status, preset, debug, save_event)
+        callbacks, form, form_outputs, status, preset, debug, save_event,
+        refresh_step_ui, step_state_inputs, step_ui_outputs,
+    )

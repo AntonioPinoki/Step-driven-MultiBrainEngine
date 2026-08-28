@@ -202,12 +202,46 @@ CUSTOM_CSS = f"""
   color: #e6e2d6 !important;
 }}
 
+[role="listbox"],
+.options {{
+  max-height: min(50vh, 32rem) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}}
+
 [role="option"]:hover,
 [role="option"][aria-selected="true"],
 .options li:hover,
 .options li.selected {{
   background: #26392e !important;
   color: #ffffff !important;
+}}
+
+.brain-lorebook-assignment-scroll {{
+  box-sizing: border-box;
+  max-height: min(64vh, 720px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.35rem;
+  scrollbar-gutter: stable;
+}}
+
+.brain-lorebook-agent-card {{
+  min-width: 0 !important;
+}}
+
+.brain-lorebook-agent-info {{
+  box-sizing: border-box;
+  padding: 0.4rem 0.75rem 0.45rem !important;
+}}
+
+.brain-lorebook-agent-label,
+.brain-lorebook-active-books,
+.brain-lorebook-active-books .prose {{
+  min-width: 0 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }}
 
 @media (max-width: 720px) {{
