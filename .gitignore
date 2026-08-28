@@ -15,6 +15,11 @@ engine/biopsychosocial_state.json
 # Runtime-generated prompts and traces may contain private conversations.
 debug/
 
+# User-managed Lorebook files and preset-specific assignments.
+Lorebooks/books/*.json
+Lorebooks/settings.json
+!Lorebooks/books/.gitkeep
+
 # Local Python environment
 .venv/
 

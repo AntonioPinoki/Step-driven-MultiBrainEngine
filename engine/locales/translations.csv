@@ -45,6 +45,12 @@ prompt_studio.help,prompt_studio,help,Prompt Studio overview,Configure up to 23 
 prompt_studio.saved_presets,prompt_studio,label,Saved preset selector,Saved presets,保存済みプリセット
 prompt_studio.preset_name,prompt_studio,label,Preset name input,Preset name,プリセット名
 prompt_studio.save_preset,prompt_studio,button,Save a named preset,Save preset,プリセットを保存
+prompt_studio.new_preset,prompt_studio,button,Create a preset with empty lore assignments,New,新規
+prompt_studio.save_as,prompt_studio,button,Save as a new preset and copy lore assignments,Save As,名前を付けて保存
+prompt_studio.rename_preset,prompt_studio,button,Rename selected preset while preserving identity,Rename,名前を変更
+prompt_studio.unseen_lore_profile,prompt_studio,label,Lore profile behavior for a preset seen for the first time,Lorebooks for a new preset,初めて使うプリセットのロアブック
+prompt_studio.copy_current_lore,prompt_studio,option,Copy current lore assignments,Copy current assignments,現在の割り当てをコピー
+prompt_studio.empty_lore,prompt_studio,option,Start without lore assignments,Start empty,空の状態で開始
 prompt_studio.export_csv,prompt_studio,button,Export preset as CSV,Export CSV,CSVを書き出す
 prompt_studio.import_csv,prompt_studio,label,Import preset CSV,Import CSV,CSVを読み込む
 prompt_studio.debug_traces,prompt_studio,label,Debug trace recording toggle,Debug traces,デバッグ記録
@@ -66,6 +72,19 @@ prompt_studio.preset_saved_status,prompt_studio,status,Named preset saved,Preset
 prompt_studio.imported_status,prompt_studio,status,Preset CSV imported,Preset imported.,プリセットを読み込みました。
 prompt_studio.export_failed,prompt_studio,error,Preset export failed,Could not export the preset: {error},プリセットを書き出せませんでした: {error}
 lorebook.global_settings,lorebooks,label,Global lorebook settings,Global settings,全体設定
+lorebook.current_preset,lorebooks,label,Currently active prompt preset,Current preset,現在のプリセット
+lorebook.refresh_books,lorebooks,button,Rescan lorebook files and active preset,Refresh,再読み込み
+lorebook.missing_and_errors,lorebooks,label,Missing assignments and invalid files,Missing and invalid items,不足・エラー項目
+lorebook.missing_files,lorebooks,label,Assigned lorebook files that no longer exist,Missing files,見つからないファイル
+lorebook.no_missing_files,lorebooks,status,No assigned lorebook files are missing,No missing files.,見つからないファイルはありません。
+lorebook.remove_missing_reference,lorebooks,button,Remove references to a missing lorebook file,Remove reference,参照を解除
+lorebook.missing_targets,lorebooks,label,Assignments targeting steps not in the active preset,Missing targets,見つからない割り当て先
+lorebook.no_missing_targets,lorebooks,status,No lore assignments target missing steps,No missing targets.,見つからない割り当て先はありません。
+lorebook.destination,lorebooks,label,New target for a missing assignment,Destination,移動先
+lorebook.move_assignment,lorebooks,button,Move a missing assignment to an active step,Move,移動
+lorebook.remove_assignment,lorebooks,button,Remove a missing target assignment,Remove assignment,割り当てを解除
+lorebook.invalid_files,lorebooks,label,Lorebook JSON files that could not be read,Invalid files,読み込めないファイル
+lorebook.no_invalid_files,lorebooks,status,No invalid lorebook files were found,No invalid files.,読み込めないファイルはありません。
 lorebook.scan_depth,lorebooks,label,Global scan depth,Scan depth,スキャン深度
 lorebook.token_budget,lorebooks,label,Token budget per agent,Token budget / agent,エージェントごとのトークン上限
 lorebook.case_sensitive,lorebooks,label,Case-sensitive key matching,Case sensitive,大文字・小文字を区別

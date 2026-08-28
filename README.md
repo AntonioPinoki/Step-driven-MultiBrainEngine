@@ -50,11 +50,14 @@ Logic providerを設定しない場合は、全エージェントがMain provide
 engine/
   start_web_ui.py      Gradio画面とサーバー起動
   web_ui.py            Gradioコントロール画面
-  launcher.py          旧Tkinter画面（移行時の互換用）
   server.py            6エージェントとOpenAI互換API
   config.json          ローカル設定（自動生成）
   config.example.json  設定例
   requirements.txt     Python依存パッケージ
+
+Lorebooks/
+  books/                1冊につき1つのLorebook JSON
+  settings.json         全体設定とプリセット別の割り当て（初回保存時に生成）
 ```
 
 APIキーは `engine/config.json` にのみ保存されます。
@@ -71,7 +74,7 @@ SillyTavern本体はこのリポジトリに含めません。使用する拡張
 
 Prompt Studio上部の `Debug traces` をオンにすると、次の生成から各推論エージェント、Final output、Summarizeへ実際に渡された完全なメッセージ列と回答を記録します。内容は `<prompt>...</prompt>` と `<answer>...</answer>` に分けられ、プロジェクト直下の `debug` フォルダへテキストファイルとして保存されます。ファイル名はエージェント名と秒までの生成時刻です。名前が空の場合、推論ステップは `step番号`、Final outputは `finaloutput`、Summarizeは `summarize` になります。
 
-サーバー起動中に、次のURLから各エージェントのプロンプトを編集できます。旧 `/prompts` 画面も移行互換用として残っています。
+サーバー起動中に、次のURLから各エージェントのプロンプトを編集できます。
 
 ```text
 http://127.0.0.1:8001/ui/
@@ -87,27 +90,31 @@ http://127.0.0.1:8001/ui/
 
 ページ下部の `Summarization` は `[[SUMMARIZE]]` 専用です。ここで要約プロンプトとTemperatureを編集できます。通常の番号付きステップやWriterとは独立しており、要約要求のときだけ使用されます。
 
-`Save` を押すと、プロンプトとTemperature設定が `engine/prompts.json` に保存され、次の会話ターンから反映されます。設定を保存するまでは組み込みの標準プロンプトが使用されます。
+`Save` を押すと、プロンプト、Temperature、現在のプリセット識別情報が `engine/prompts.json` に保存され、次の会話ターンから反映されます。設定を保存するまでは組み込みの標準プロンプトが使用されます。
 
-新しく保存するCSVプリセットでは、`step1`～`step23` と `writer` に加えて、各Step、Writer、サマライズ用のTemperature設定が保存されます。以前の監視列を含むCSVも読み込めますが、その列は無視されます。
+新しく保存するCSVプリセットでは、`step1`～`step23` と `writer` に加えて、プリセット固有ID、各Stepの固有ID、各Step、Writer、サマライズ用のTemperature設定が保存されます。IDを持たない旧CSVは初回読込時にIDが付与され、同じファイルへ新形式で保存されます。以前の監視列を含むCSVも読み込めますが、その列は無視されます。
 
 同じキャラクターの発言をユーザーメッセージなしで連続生成する場合も、BrainEngineは末尾に専用の制御メッセージを追加します。このメッセージは通常のロールプレイ発言と区別された書式で、KoboldCppへ新しいassistantターンを要求するための内部命令です。
 
 ### CSVプリセットの共有
 
-Prompt Studio上部の `Preset name` に名前を入力し、`Save preset` を押すと、プロジェクト直下の `Preset` フォルダへCSVファイルが保存されます。`Export` を押すと、同じ内容をローカルへダウンロードできます。どちらにも各ステップのタイトルが含まれます。
+Prompt Studio上部のPreset nameに名前を入力してSave Asを押すと、新しい固有IDを持つCSVがプロジェクト直下のPresetフォルダへ保存され、現在のLorebook割り当ても新しいプリセットへコピーされます。Newは標準プロンプトと空のLorebook割り当てで新規作成し、Renameは選択中プリセットの固有ID、Step ID、Lorebook割り当てを維持したまま名称を変更します。Exportは現在の内容をローカルへダウンロードします。
 
-Prompt Studioを開くと、`Preset`フォルダ内のCSVが`Saved presets…`プルダウンへ自動的に一覧表示されます。選択したプリセットはその場で現在設定として保存され、次のチャットリクエストから有効になります。新しく保存・ImportしたCSVも一覧へ即時反映されます。
+Prompt Studioを開くと、Presetフォルダ内のCSVがSaved presetsプルダウンへ自動的に一覧表示されます。選択したプリセットはその場で現在設定として保存され、次のチャットリクエストから有効になります。そのプリセット用のLorebook設定がまだない場合は、画面上部の選択に従って現在の割り当てをコピーするか、空で開始します。新規作成、別名保存、名称変更、Import、プリセット切替の直後にはLorebooks画面も現在のプリセットへ更新されます。
 
-CSVは1行のプリセットで、`step1`〜`step23` と `writer` のプロンプト列に加え、`step1_title`〜`step23_title`、`writer_title`、`summarize_title` のタイトル列を持ちます。使用していないステップは空欄です。改行やカンマを含むプロンプトとタイトルもCSVの引用符で保持されます。
+CSVは1行のプリセットで、`preset_id`、`preset_name`、`step1`〜`step23`、`writer` のプロンプト列に加え、`step1_id`〜`step23_id`、`step1_title`〜`step23_title`、`writer_title`、`summarize_title` の列を持ちます。使用していないステップは空欄です。改行やカンマを含むプロンプトとタイトルもCSVの引用符で保持されます。
 
 タイトル列を持たない以前のCSVも読み込めます。その場合、番号付きステップには `Step 1` のような既定タイトルが割り当てられます。新しく保存・ExportしたCSVでは、Prompt Studioで入力したタイトルが保存され、Importまたはプリセット選択時に復元されます。
 
 ## Agent Lorebooks
 
-コントロールウィンドウの `Lorebooks` タブでは、SillyTavern互換のWorld Infoを作成・編集し、推論ステップまたはWriterへ個別に割り当てられます。画面上部の「エージェントへの割り当て」を開くと、Prompt Studioで現在有効なすべての推論ステップとWriterが表示されます。各エージェントの右側にある検索可能なプルダウンから使用するロアブックを選び、その下の「ロアブック設定を保存」で保存してください。現在適用中のロアブック名は各エージェント名の下に表示され、数が多い場合は自動的に折り返されます。割り当て欄とプルダウン候補は、項目が多い場合に内部スクロールできます。1エージェントには複数のロアブックを割り当てられ、プルダウンの選択順に適用されます。Summarizeにはロアブックは適用されません。
+コントロールウィンドウの `Lorebooks` タブでは、SillyTavern互換のWorld Infoを作成・編集し、推論ステップまたはWriterへ個別に割り当てられます。画面上部の「エージェントへの割り当て」を開くと、Prompt Studioで現在有効なすべての推論ステップとWriterが表示されます。各エージェントの右側にある検索可能なプルダウンから使用するロアブックを選び、その下の「ロアブック設定を保存」で保存してください。現在適用中のロアブック名は各エージェント名の下に表示され、数が多い場合は自動的に折り返されます。割り当て欄とプルダウン候補は、項目が多い場合に内部スクロールできます。1エージェントには複数のロアブックを割り当てられ、プルダウンの選択順に適用されます。割り当ては現在のPromptプリセットIDごとに保存され、Summarizeには適用されません。
 
-`Import ST JSON` はSillyTavernから書き出したWorld Info JSONを複製して取り込みます。取り込んだデータは `engine/lorebooks.json` へ保存され、元のSillyTavernファイルとは同期されません。Prompt StudioのCSVプリセットにも含まれません。
+`Import ST JSON` はSillyTavernから書き出したWorld Info JSONを `Lorebooks/books` へ1冊ずつ保存します。同じフォルダへSillyTavernのJSONを直接配置することもでき、起動時または再読込時に自動認識されます。割り当て設定だけを保存した場合、Lorebook JSON自体は書き換えません。本文を編集した場合も、未対応の独自フィールドを保持したまま編集対象だけを更新します。壊れたJSONがあっても、そのファイルだけが除外されます。Lorebook本体はPrompt StudioのCSVプリセットには含まれません。
+
+Lorebookファイルを削除しても、settings.json内の割り当て参照は自動削除されません。同じファイル名を戻すと割り当てが復帰します。Lorebooks画面の「不足・エラー項目」では、見つからないファイルの参照だけを解除できます。現在のプリセットから削除されたStepへの割り当ても保存されたまま実行時には無視され、同じ欄から現存するStepへ移動するか解除できます。読み込めないJSONもファイル名とエラーを確認できます。
+
+`Lorebooks/settings.json` が壊れている場合は、既存の割り当てを保護するためLorebook設定の保存を拒否します。ファイルを修復または削除してから再読み込みしてください。
 
 各エントリーは常時発動またはPrimary／Secondary Keyによる発動を選択できます。標準スキャン範囲は直近2件のユーザー／アシスタントメッセージで、全体設定またはエントリー別の深度で変更できます。BrainEngine Connector 0.4.0以降から受信したキャラクターカードとユーザーペルソナも常時検索されますが、これらはメッセージのスキャン深度には含まれず、LLMプロンプトにも追加注入されません。発動した内容は次の形で、保存済みエージェントプロンプトの後、一時オーダーの前へ追加されます。
 

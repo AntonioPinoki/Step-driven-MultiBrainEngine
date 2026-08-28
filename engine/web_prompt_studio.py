@@ -94,7 +94,10 @@ def form_to_config(values: Iterable[Any]) -> dict[str, Any]:
 
     writer = fixed("writer")
     summary = fixed("summary")
-    return prompt_store.validate_config(steps, writer, summary, values[cursor])
+    config = prompt_store.validate_config(steps, writer, summary, values[cursor])
+    config.pop("preset_id", None)
+    config.pop("preset_name", None)
+    return config
 
 
 def step_number_choices(enabled_values: Iterable[Any], number_values: Iterable[Any]):
@@ -136,12 +139,18 @@ class PromptStudioCallbacks:
         default_summary: dict[str, Any],
         get_debug: Callable[[], bool] | None = None,
         set_debug: Callable[[bool], Any] | None = None,
+        ensure_profile: Callable[..., Any] | None = None,
+        rename_profile: Callable[[str, str], Any] | None = None,
+        active_preset_text: str = "Active preset",
     ) -> None:
         self.default_steps = default_steps
         self.default_writer = default_writer
         self.default_summary = default_summary
         self.get_debug = get_debug or (lambda: False)
         self.set_debug = set_debug or (lambda enabled: enabled)
+        self.ensure_profile = ensure_profile or (lambda *args, **kwargs: None)
+        self.rename_profile = rename_profile or (lambda *args, **kwargs: None)
+        self.active_preset_text = active_preset_text
 
     def load(self) -> tuple[Any, ...]:
         return config_to_form(prompt_store.load_config(
@@ -155,20 +164,75 @@ class PromptStudioCallbacks:
     def presets(self) -> list[tuple[str, str]]:
         return [(item["name"], item["filename"]) for item in prompt_store.list_presets()]
 
-    def save_preset(self, name: str, *values: Any) -> tuple[str, PresetDropdownState]:
+    def require_unused_name(self, name: str) -> str:
+        return prompt_store.require_unused_preset_name(name)
+
+    def unique_import_name(self, name: str) -> str:
+        return prompt_store.unique_preset_name(name)
+
+    def save_preset(self, name: str, *values: Any) -> tuple[str, PresetDropdownState, str]:
+        """Save As: create a new preset identity and clone the active lore profile."""
+        name = self.require_unused_name(name)
+        source = prompt_store.load_config(
+            self.default_steps, self.default_writer, self.default_summary)
         config = form_to_config(values)
         result = prompt_store.save_preset(name, **config)
+        config["preset_id"] = result["preset_id"]
+        config["preset_name"] = result["preset_name"]
+        prompt_store.save_config(**config)
+        self.ensure_profile(
+            result["preset_id"], result["preset_name"],
+            copy_from=source["preset_id"])
         return (
             f"Saved preset: {result['filename']}",
             PresetDropdownState(self.presets(), result["filename"]),
+            self.active_label(config),
         )
 
-    def load_preset(self, filename: str) -> tuple[Any, ...]:
+    def load_preset(self, filename: str, profile_mode: str = "copy") -> tuple[Any, ...]:
+        source = prompt_store.load_config(
+            self.default_steps, self.default_writer, self.default_summary)
         config = prompt_store.load_preset_file(
             filename, self.default_writer, self.default_summary)
-        return (f"Loaded preset: {filename}", *config_to_form(config))
+        self.ensure_profile(
+            config["preset_id"], config["preset_name"],
+            copy_from=source["preset_id"] if profile_mode == "copy" else None)
+        return (
+            f"Loaded preset: {filename}", self.active_label(config),
+            *config_to_form(config))
 
-    def import_preset(self, file_value: Any) -> tuple[Any, ...]:
+    def new_preset(self, name: str) -> tuple[Any, ...]:
+        display_name = self.require_unused_name(name)
+        config = prompt_store.validate_config(
+            self.default_steps, self.default_writer, self.default_summary,
+            preset_name=display_name)
+        config.pop("preset_id", None)
+        config.pop("preset_name", None)
+        result = prompt_store.save_preset(display_name, **config)
+        config["preset_id"] = result["preset_id"]
+        config["preset_name"] = result["preset_name"]
+        active = prompt_store.save_config(**config)
+        self.ensure_profile(active["preset_id"], active["preset_name"])
+        return (
+            f"Created preset: {result['filename']}",
+            PresetDropdownState(self.presets(), result["filename"]),
+            self.active_label(active), *config_to_form(active))
+
+    def rename_preset(self, filename: str, name: str) -> tuple[Any, ...]:
+        result = prompt_store.rename_preset(
+            filename, name, self.default_writer, self.default_summary)
+        self.rename_profile(result["preset_id"], result["preset_name"])
+        return (
+            f"Renamed preset: {result['filename']}",
+            PresetDropdownState(self.presets(), result["filename"]),
+            self.active_label(result["config"]), *config_to_form(result["config"]))
+
+    def active_label(self, config: dict[str, Any]) -> str:
+        return f"**{self.active_preset_text}:** {config.get('preset_name', 'Default')}"
+
+    def import_preset(self, file_value: Any, profile_mode: str = "copy") -> tuple[Any, ...]:
+        source = prompt_store.load_config(
+            self.default_steps, self.default_writer, self.default_summary)
         path = getattr(file_value, "name", file_value)
         if not path:
             raise ValueError("Choose a CSV preset to import")
@@ -176,13 +240,22 @@ class PromptStudioCallbacks:
             raise ValueError("CSV file is too large")
         with open(path, "r", encoding="utf-8-sig", newline="") as handle:
             csv_text = handle.read()
-        config = prompt_store.import_preset(
-            csv_text, self.default_writer, self.default_summary)
         name = os.path.splitext(os.path.basename(path))[0]
+        name = self.unique_import_name(name)
+        config = prompt_store.csv_to_config(
+            csv_text, self.default_writer, self.default_summary, preset_name=name)
+        config["preset_id"] = prompt_store.distinct_preset_id(
+            config["preset_id"], [source["preset_id"]])
         result = prompt_store.save_preset(name, **config)
+        config["preset_name"] = result["preset_name"]
+        prompt_store.save_config(**config)
+        self.ensure_profile(
+            config["preset_id"], config["preset_name"],
+            copy_from=source["preset_id"] if profile_mode == "copy" else None)
         return (
             f"Imported preset: {result['filename']}",
             PresetDropdownState(self.presets(), result["filename"]),
+            self.active_label(config),
             *config_to_form(config),
         )
 
@@ -220,6 +293,7 @@ class PromptStudioUI:
     refresh_step_ui: Callable[..., list[Any]]
     step_state_inputs: list[Any]
     step_ui_outputs: list[Any]
+    identity_events: list[Any]
 
 
 def _sampling_controls(gr: Any, prefix: str, values: Iterable[Any], tr=lambda key: key) -> list[Any]:
@@ -242,6 +316,8 @@ def build_prompt_studio(
     *,
     get_debug: Callable[[], bool] | None = None,
     set_debug: Callable[[bool], Any] | None = None,
+    ensure_profile: Callable[..., Any] | None = None,
+    rename_profile: Callable[[str, str], Any] | None = None,
     i18n: Any | None = None,
 ) -> PromptStudioUI:
     """Build Prompt Studio inside the caller's active ``gr.Blocks``/``gr.Tab``.
@@ -252,21 +328,32 @@ def build_prompt_studio(
     tr = i18n or (lambda key: key)
 
     callbacks = PromptStudioCallbacks(
-        default_steps, default_writer, default_summary, get_debug, set_debug)
+        default_steps, default_writer, default_summary, get_debug, set_debug,
+        ensure_profile, rename_profile, tr("lorebook.current_preset"))
     initial = prompt_store.load_config(default_steps, default_writer, default_summary)
     initial_values = iter(config_to_form(initial))
     form: list[Any] = []
 
     gr.Markdown(tr("prompt_studio_help"))
+    active_preset = gr.Markdown(callbacks.active_label(initial))
     with gr.Row():
         debug = gr.Checkbox(value=callbacks.debug_state(), label=tr("debug_traces"))
         save_button = gr.Button(tr("save_settings"), variant="primary")
     with gr.Row():
         preset = gr.Dropdown(callbacks.presets(), label=tr("saved_presets"))
         preset_name = gr.Textbox(label=tr("preset_name"), placeholder="My preset")
-        save_preset_button = gr.Button(tr("save_preset"))
+        new_preset_button = gr.Button(tr("prompt_studio.new_preset"))
+        save_preset_button = gr.Button(tr("prompt_studio.save_as"))
+        rename_preset_button = gr.Button(tr("prompt_studio.rename_preset"))
         export_button = gr.Button(tr("export_csv"))
         import_file = gr.File(label=tr("import_csv"), file_types=[".csv"], type="filepath")
+    profile_mode = gr.Radio(
+        choices=[
+            (tr("prompt_studio.copy_current_lore"), "copy"),
+            (tr("prompt_studio.empty_lore"), "empty"),
+        ],
+        value="copy", label=tr("prompt_studio.unseen_lore_profile"),
+    )
     status = gr.Markdown()
     export_file = gr.File(
         label=tr("exported_preset"), interactive=False,
@@ -337,12 +424,20 @@ def build_prompt_studio(
         return gr.update(choices=state.choices, value=state.value)
 
     def save_preset(*values):
-        message, state = callbacks.save_preset(*values)
-        return message, preset_dropdown_update(state)
+        message, state, active = callbacks.save_preset(*values)
+        return message, preset_dropdown_update(state), active
 
-    def import_preset(file_value):
-        message, state, *form_values = callbacks.import_preset(file_value)
-        return message, preset_dropdown_update(state), *form_values
+    def new_preset(name):
+        message, state, active, *form_values = callbacks.new_preset(name)
+        return message, preset_dropdown_update(state), active, *form_values
+
+    def rename_preset(filename, name):
+        message, state, active, *form_values = callbacks.rename_preset(filename, name)
+        return message, preset_dropdown_update(state), active, *form_values
+
+    def import_preset(file_value, mode):
+        message, state, active, *form_values = callbacks.import_preset(file_value, mode)
+        return message, preset_dropdown_update(state), active, *form_values
 
     def refresh_step_ui(*step_values):
         enabled_values, number_values, choices = step_ui_state(
@@ -406,15 +501,26 @@ def build_prompt_studio(
 
     save_event = save_button.click(
         callbacks.save, inputs=form, outputs=[status, *form_outputs])
-    save_preset_button.click(
-        save_preset, inputs=[preset_name, *form], outputs=[status, preset])
+    save_as_event = save_preset_button.click(
+        save_preset, inputs=[preset_name, *form], outputs=[status, preset, active_preset])
+    new_event = new_preset_button.click(
+        new_preset, inputs=preset_name,
+        outputs=[status, preset, active_preset, *form_outputs])
+    new_event.then(refresh_step_ui, step_state_inputs, step_ui_outputs,
+                   show_progress="hidden")
+    rename_event = rename_preset_button.click(
+        rename_preset, inputs=[preset, preset_name],
+        outputs=[status, preset, active_preset, *form_outputs])
+    rename_event.then(refresh_step_ui, step_state_inputs, step_ui_outputs,
+                      show_progress="hidden")
     preset_event = preset.change(
-        callbacks.load_preset, inputs=preset, outputs=[status, *form_outputs])
+        callbacks.load_preset, inputs=[preset, profile_mode],
+        outputs=[status, active_preset, *form_outputs])
     preset_event.then(refresh_step_ui, step_state_inputs, step_ui_outputs,
                       show_progress="hidden")
     import_event = import_file.change(
-        import_preset, inputs=import_file,
-        outputs=[status, preset, *form_outputs],
+        import_preset, inputs=[import_file, profile_mode],
+        outputs=[status, preset, active_preset, *form_outputs],
     )
     import_event.then(refresh_step_ui, step_state_inputs, step_ui_outputs,
                       show_progress="hidden")
@@ -424,4 +530,5 @@ def build_prompt_studio(
     return PromptStudioUI(
         callbacks, form, form_outputs, status, preset, debug, save_event,
         refresh_step_ui, step_state_inputs, step_ui_outputs,
+        [save_as_event, new_event, rename_event, preset_event, import_event],
     )

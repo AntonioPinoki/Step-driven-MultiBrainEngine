@@ -14,7 +14,7 @@ import sys
 import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from openai import AsyncOpenAI
 import provider_config
 import prompt_store
@@ -36,7 +36,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
 
@@ -58,6 +58,7 @@ PROMPT_ORDERS = {}
 # Context snapshots sent by the SillyTavern extension. These are intentionally
 # memory-only for now and are cleared whenever BrainEngine restarts.
 SILLYTAVERN_CONTEXT_HISTORY = deque(maxlen=50)
+PENDING_SILLYTAVERN_CONTEXTS = deque(maxlen=50)
 LATEST_SILLYTAVERN_CONTEXT = None
 
 # Keep Uvicorn/FastAPI access logs (the `INFO: ... POST ...` lines), while
@@ -107,22 +108,62 @@ def _sillytavern_lore_scan_context(character, user):
     return "\n".join(value for value in values if isinstance(value, str) and value.strip())
 
 
-def claim_sillytavern_role_binding(max_age_seconds=15.0):
-    """Claim one fresh automatic snapshot for the next roleplay invocation."""
-    context = LATEST_SILLYTAVERN_CONTEXT
-    if not isinstance(context, dict) or context.get("_consumed"):
-        return None
+def _snapshot_matches_request(context, data, raw_messages):
+    chat = context.get("chat") if isinstance(context, dict) else None
+    chat = chat if isinstance(chat, dict) else {}
+    explicit_chat_id = _safe_display_name(
+        (data if isinstance(data, dict) else {}).get("chat_id"))
+    snapshot_chat_id = _safe_display_name(chat.get("id"))
+    if explicit_chat_id:
+        return bool(snapshot_chat_id and explicit_chat_id == snapshot_chat_id)
+    latest = chat.get("last_message")
+    if not isinstance(latest, dict):
+        return False
+    expected_role = str(latest.get("role") or "")
+    expected_text = latest.get("text")
+    if expected_role not in {"user", "assistant"} or not isinstance(expected_text, str):
+        return False
+    candidates = [
+        message for message in (raw_messages if isinstance(raw_messages, list) else [])
+        if isinstance(message, dict) and message.get("role") == expected_role
+        and isinstance(message.get("content"), str)
+    ]
+    return any(message["content"] == expected_text for message in candidates[-4:])
 
-    received_monotonic = context.get("_received_monotonic")
-    if not isinstance(received_monotonic, (int, float)):
+
+def claim_sillytavern_role_binding(
+    raw_messages=None, data=None, max_age_seconds=15.0,
+):
+    """Claim the one fresh connector snapshot that matches this completion."""
+    now = time.monotonic()
+    fresh = []
+    for context in list(PENDING_SILLYTAVERN_CONTEXTS):
+        received = context.get("_received_monotonic")
+        generation = context.get("generation") or {}
+        if (
+            isinstance(received, (int, float))
+            and now - received <= max_age_seconds
+            and str(generation.get("type") or "").lower() != "manual"
+        ):
+            fresh.append(context)
+        else:
+            try:
+                PENDING_SILLYTAVERN_CONTEXTS.remove(context)
+            except ValueError:
+                pass
+    matches = [
+        context for context in fresh
+        if _snapshot_matches_request(context, data, raw_messages)
+    ]
+    if len(matches) != 1:
         return None
-    if time.monotonic() - received_monotonic > max_age_seconds:
+    context = matches[0]
+    try:
+        PENDING_SILLYTAVERN_CONTEXTS.remove(context)
+    except ValueError:
         return None
 
     generation = context.get("generation") or {}
-    if str(generation.get("type") or "").lower() == "manual":
-        return None
-
     character = context.get("character") or {}
     user = context.get("user") or {}
     group = context.get("group") if isinstance(context.get("group"), dict) else None
@@ -131,7 +172,6 @@ def claim_sillytavern_role_binding(max_age_seconds=15.0):
     if not char_name or not user_name:
         return None
 
-    context["_consumed"] = True
     binding = {
         "user_name": user_name,
         "char_name": char_name,
@@ -846,8 +886,7 @@ def active_prompt_setup():
 
 def active_lorebook_setup(prompt_config=None):
     prompt_config = prompt_config or active_prompt_setup()
-    agent_ids = [str(item["id"]) for item in prompt_config["steps"]] + ["writer"]
-    return lorebook_store.load_config(agent_ids)
+    return lorebook_store.load_config(prompt_config)
 
 
 def activated_lore_by_agent(raw_messages, prompt_config, role_binding):
@@ -1260,9 +1299,10 @@ async def receive_sillytavern_context(request: Request):
     stored = copy.deepcopy(payload)
     stored["received_at"] = received_at
     stored["_received_monotonic"] = time.monotonic()
-    stored["_consumed"] = False
     LATEST_SILLYTAVERN_CONTEXT = stored
     SILLYTAVERN_CONTEXT_HISTORY.append(stored)
+    if str((stored.get("generation") or {}).get("type") or "").lower() != "manual":
+        PENDING_SILLYTAVERN_CONTEXTS.append(stored)
 
     generation_type = str(stored["generation"].get("type") or "unknown")
     chat_id = str(stored["chat"].get("id") or "unknown")
@@ -1297,11 +1337,6 @@ async def get_models():
     return {"object": "list", "data": [{"id": "brainengine2-biopsychosocial", "object": "model", "owned_by": "custom"}]}
 
 
-@app.get("/prompts", response_class=HTMLResponse)
-async def prompt_editor():
-    return prompt_store.read_editor()
-
-
 @app.get("/api/prompts")
 async def get_prompts():
     return active_prompt_setup()
@@ -1323,8 +1358,7 @@ async def save_lorebooks(request: Request):
     try:
         payload = await request.json()
         prompts = active_prompt_setup()
-        agent_ids = [str(item["id"]) for item in prompts["steps"]] + ["writer"]
-        return lorebook_store.save_config(payload, agent_ids)
+        return lorebook_store.save_config(payload, prompts)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -1338,7 +1372,17 @@ async def import_lorebook(request: Request):
         payload = await request.json()
         source = payload.get("data") if isinstance(payload, dict) else None
         name = payload.get("name") if isinstance(payload, dict) else None
-        return {"book": lorebook_store.import_sillytavern(source, name or "Imported Lorebook")}
+        return {"book": lorebook_store.import_book_file(
+            source, name or "Imported Lorebook")}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/api/lorebooks/books/{filename}")
+async def delete_lorebook(filename: str):
+    try:
+        lorebook_store.delete_book_file(filename)
+        return {"deleted": True, "filename": filename}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -1385,11 +1429,25 @@ async def save_prompts(request: Request):
 async def save_preset(request: Request):
     try:
         payload = await request.json()
+        if not isinstance(payload, dict):
+            raise ValueError("request body must be an object")
+        name = prompt_store.require_unused_preset_name(payload.get("name"))
+        source = active_prompt_setup()
         result = prompt_store.save_preset(
-            payload.get("name"), payload.get("steps"), payload.get("writer"),
+            name, payload.get("steps"), payload.get("writer"),
             payload.get("summary"), payload.get("group_prompt")
         )
-        return {"saved": True, "filename": result["filename"]}
+        config = prompt_store.validate_config(
+            payload.get("steps"), payload.get("writer"), payload.get("summary"),
+            payload.get("group_prompt"), result["preset_id"], result["preset_name"])
+        active = prompt_store.save_config(**config)
+        lorebook_store.ensure_profile(
+            active["preset_id"], active["preset_name"],
+            copy_from=source["preset_id"])
+        return {
+            "saved": True, "filename": result["filename"],
+            **active,
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -1422,9 +1480,18 @@ async def get_presets():
 async def load_saved_preset(request: Request):
     try:
         payload = await request.json()
+        if not isinstance(payload, dict):
+            raise ValueError("request body must be an object")
+        profile_mode = str(payload.get("profile_mode") or "copy")
+        if profile_mode not in {"copy", "empty"}:
+            raise ValueError("profile_mode must be copy or empty")
+        source = active_prompt_setup()
         config = prompt_store.load_preset_file(
             payload.get("filename"), DEFAULT_WRITER, DEFAULT_SUMMARY
         )
+        lorebook_store.ensure_profile(
+            config["preset_id"], config["preset_name"],
+            copy_from=source["preset_id"] if profile_mode == "copy" else None)
         return {"loaded": True, **config}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1437,12 +1504,31 @@ async def load_saved_preset(request: Request):
 async def import_preset(request: Request):
     try:
         payload = await request.json()
-        config = prompt_store.import_preset(payload.get("csv"), DEFAULT_WRITER, DEFAULT_SUMMARY)
-        prompt_store.save_preset(
-            os.path.splitext(os.path.basename(str(payload.get("filename") or "imported_preset")))[0],
-            config["steps"], config["writer"], config["summary"], config.get("group_prompt", "")
+        if not isinstance(payload, dict):
+            raise ValueError("request body must be an object")
+        profile_mode = str(payload.get("profile_mode") or "copy")
+        if profile_mode not in {"copy", "empty"}:
+            raise ValueError("profile_mode must be copy or empty")
+        source = active_prompt_setup()
+        name = prompt_store.unique_preset_name(os.path.splitext(os.path.basename(
+            str(payload.get("filename") or "imported_preset")))[0]
         )
-        return {"imported": True, **config}
+        config = prompt_store.csv_to_config(
+            payload.get("csv"), DEFAULT_WRITER, DEFAULT_SUMMARY, preset_name=name)
+        config["preset_id"] = prompt_store.distinct_preset_id(
+            config["preset_id"], [source["preset_id"]])
+        result = prompt_store.save_preset(
+            name,
+            config["steps"], config["writer"], config["summary"],
+            config.get("group_prompt", ""),
+            preset_id=config["preset_id"], preset_name=config["preset_name"],
+        )
+        config["preset_name"] = result["preset_name"]
+        active = prompt_store.save_config(**config)
+        lorebook_store.ensure_profile(
+            active["preset_id"], active["preset_name"],
+            copy_from=source["preset_id"] if profile_mode == "copy" else None)
+        return {"imported": True, "filename": result["filename"], **active}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -1595,13 +1681,13 @@ async def chat_completions(request: Request):
     raw_messages = data.get("messages", [])
     prompt_config = active_prompt_setup()
     request_orders = dict(PROMPT_ORDERS)
+    connector_binding = claim_sillytavern_role_binding(raw_messages, data)
 
     if is_summary_request(raw_messages):
         progress_log("\n📚 [[SUMMARIZE]] detected — bypassing the reasoning chain.")
         summary_config = prompt_with_order(prompt_config["summary"], request_orders)
         return await summary_response(data, raw_messages, summary_config, request)
 
-    connector_binding = claim_sillytavern_role_binding()
     role_binding = request_role_binding(data, raw_messages, connector_binding)
     char_name = role_binding["char_name"]
     is_continue = bool(role_binding and role_binding["generation_type"] == "continue")

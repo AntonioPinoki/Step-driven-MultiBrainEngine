@@ -21,6 +21,17 @@ def book_choices(draft):
     return [(book.get("name") or book["id"], book["id"]) for book in (draft or {}).get("books", [])]
 
 
+def assignment_book_choices(draft):
+    choices = book_choices(draft)
+    known = {value for _, value in choices}
+    choices.extend(
+        (f"⚠ {filename} (Missing)", filename)
+        for filename in (draft or {}).get("missing_files", [])
+        if filename not in known
+    )
+    return choices
+
+
 def entry_choices(draft, book_id):
     book = find_book(draft, book_id)
     return [(entry.get("name") or entry["id"], entry["id"]) for entry in (book or {}).get("entries", [])]
@@ -97,7 +108,10 @@ def delete_book(draft, book_id):
 def update_assignments(draft, agent_ids, selections):
     """Return a draft containing the complete set of visible agent assignments."""
     updated = _copy(draft or {})
-    known_books = {book["id"] for book in updated.get("books", [])}
+    known_books = (
+        {book["id"] for book in updated.get("books", [])}
+        | {str(item) for item in updated.get("missing_files", [])}
+    )
     assignments = {}
     for agent_id, selected in zip(agent_ids, selections):
         agent_id = str(agent_id or "")
@@ -120,17 +134,35 @@ def assigned_book_names(draft, book_ids):
         for book in (draft or {}).get("books", [])
     }
     return [
-        names[str(book_id)]
+        names.get(str(book_id), f"⚠ {book_id} (Missing)")
         for book_id in book_ids or []
-        if str(book_id) in names
     ]
 
 
-def build_lorebooks(gr: Any, *, load_config, save_config, import_book, i18n=None):
+def build_lorebooks(
+    gr: Any, *, load_config, save_config, import_book, delete_book_file,
+    move_assignment_target, remove_assignment_target,
+    remove_missing_file_reference, i18n=None,
+):
     draft = gr.State({})
     tr = i18n or (lambda key: key)
     gr.Markdown("### Lorebooks")
+    with gr.Row():
+        active_preset = gr.Markdown("")
+        refresh_button = gr.Button(tr("lorebook.refresh_books"), scale=1)
     status = gr.Markdown("")
+    with gr.Accordion(tr("lorebook.missing_and_errors"), open=False):
+        missing_files_text = gr.Markdown("")
+        with gr.Row():
+            missing_file = gr.Dropdown(label=tr("lorebook.missing_files"))
+            remove_missing_file_button = gr.Button(tr("lorebook.remove_missing_reference"))
+        missing_targets_text = gr.Markdown("")
+        with gr.Row():
+            missing_target = gr.Dropdown(label=tr("lorebook.missing_targets"))
+            destination = gr.Dropdown(label=tr("lorebook.destination"))
+            move_target_button = gr.Button(tr("lorebook.move_assignment"))
+            remove_target_button = gr.Button(tr("lorebook.remove_assignment"))
+        book_errors_text = gr.Markdown("")
     with gr.Accordion(tr("global_settings"), open=False):
         with gr.Row():
             scan_depth = gr.Number(value=2, precision=0, minimum=1, maximum=1000, label=tr("scan_depth"))
@@ -215,7 +247,7 @@ def build_lorebooks(gr: Any, *, load_config, save_config, import_book, i18n=None
         return f"**{tr('lorebook.active_books')}:** {listing}"
 
     def assignment_control_values(body):
-        books = book_choices(body)
+        books = assignment_book_choices(body)
         agents = list((body or {}).get("agents", []))[:MAX_ASSIGNMENT_AGENTS]
         agent_ids = []
         rows = []
@@ -242,6 +274,61 @@ def build_lorebooks(gr: Any, *, load_config, save_config, import_book, i18n=None
                 summaries.append("")
         return [*agent_ids, *rows, *labels, *dropdowns, *summaries]
 
+    def issue_values(body):
+        preset_name = html.escape(str(body.get("preset_name") or "Default"))
+        preset = f"**{tr('lorebook.current_preset')}:** {preset_name}"
+        missing = list(body.get("missing_files", []))
+        missing_lines = (
+            "\n".join(f"- <code>{html.escape(str(item))}</code>" for item in missing)
+            if missing else tr("lorebook.no_missing_files")
+        )
+        targets = list(body.get("missing_targets", []))
+        target_choices = []
+        for item in targets:
+            position = item.get("target_position")
+            suffix = f" (Step {position})" if position not in (None, "") else ""
+            label = f"{item.get('target_name') or item['target_id']}{suffix}"
+            target_choices.append((label, item["target_id"]))
+        target_lines = (
+            "\n".join(
+                f"- **{html.escape(str(item.get('target_name') or item['target_id']))}** "
+                f"(<code>{html.escape(str(item['target_id']))}</code>)"
+                for item in targets
+            )
+            if targets else tr("lorebook.no_missing_targets")
+        )
+        destinations = [
+            (assignment_label(agent), str(agent["id"]))
+            for agent in body.get("agents", [])
+        ]
+        errors = list(body.get("book_errors", []))
+        settings_error = str(body.get("settings_error") or "").strip()
+        error_lines = (
+            "\n".join(
+                f"- <code>{html.escape(str(item.get('file', '')))}</code>: "
+                f"{html.escape(str(item.get('error', '')))}"
+                for item in errors
+            )
+            if errors else tr("lorebook.no_invalid_files")
+        )
+        if settings_error:
+            error_lines = (
+                f"- **settings.json:** {html.escape(settings_error)}\n"
+                + error_lines
+            )
+        return (
+            preset,
+            f"**{tr('lorebook.missing_files')}**\n\n{missing_lines}",
+            gr.Dropdown(choices=[(item, item) for item in missing],
+                        value=missing[0] if missing else None),
+            f"**{tr('lorebook.missing_targets')}**\n\n{target_lines}",
+            gr.Dropdown(choices=target_choices,
+                        value=target_choices[0][1] if target_choices else None),
+            gr.Dropdown(choices=destinations,
+                        value=destinations[0][1] if destinations else None),
+            f"**{tr('lorebook.invalid_files')}**\n\n{error_lines}",
+        )
+
     def load_all():
         body = load_config()
         books = book_choices(body)
@@ -250,7 +337,8 @@ def build_lorebooks(gr: Any, *, load_config, save_config, import_book, i18n=None
         entry_id = entries[0][1] if entries else None
         settings = body.get("settings", {})
         return (
-            body, gr.Dropdown(choices=books, value=book_id),
+            body, *issue_values(body),
+            gr.Dropdown(choices=books, value=book_id),
             gr.Dropdown(choices=entries, value=entry_id),
             *entry_values(body, book_id, entry_id),
             *assignment_control_values(body),
@@ -261,7 +349,12 @@ def build_lorebooks(gr: Any, *, load_config, save_config, import_book, i18n=None
 
     def refresh_assignments(body):
         fresh = load_config()
-        updated = _copy(body) if body else _copy(fresh)
+        if body and body.get("preset_id") == fresh.get("preset_id"):
+            updated = _copy(body)
+        else:
+            updated = _copy(fresh)
+        updated["preset_id"] = fresh.get("preset_id")
+        updated["preset_name"] = fresh.get("preset_name")
         updated["agents"] = fresh.get("agents", [])
         valid_agents = {str(agent["id"]) for agent in updated["agents"]}
         updated["assignments"] = {
@@ -312,13 +405,11 @@ def build_lorebooks(gr: Any, *, load_config, save_config, import_book, i18n=None
         updated, book_id = add_book(body)
         return updated, gr.Dropdown(choices=book_choices(updated), value=book_id), gr.Dropdown(choices=[], value=None), *entry_values(updated, book_id, None)
 
-    def remove_book(body, book_id):
-        updated = delete_book(body, book_id)
-        choices = book_choices(updated)
-        selected = choices[0][1] if choices else None
-        entries = entry_choices(updated, selected)
-        selected_entry = entries[0][1] if entries else None
-        return updated, gr.Dropdown(choices=choices, value=selected), gr.Dropdown(choices=entries, value=selected_entry), *entry_values(updated, selected, selected_entry)
+    def remove_book_file(book_id):
+        if not book_id:
+            raise gr.Error("Select a lorebook first")
+        delete_book_file(book_id)
+        return load_all()
 
     def create_entry(body, book_id):
         try:
@@ -350,20 +441,37 @@ def build_lorebooks(gr: Any, *, load_config, save_config, import_book, i18n=None
             **updated.get("settings", {}), "scan_depth": int(depth), "token_budget": int(budget),
             "case_sensitive": bool(case), "match_whole_words": bool(whole), "recursive": bool(recurse),
         }
-        saved = save_config(updated)
-        saved["agents"] = body.get("agents", [])
-        return saved, tr("lorebook.saved_status")
+        save_config(updated)
+        values = list(load_all())
+        values[-1] = tr("lorebook.saved_status")
+        return tuple(values)
 
-    def import_json(path, body):
+    def import_json(path):
         if not path:
-            return body, gr.Dropdown(choices=book_choices(body)), "No file selected"
+            return load_all()
         if os.path.getsize(path) > 8 * 1024 * 1024:
             raise gr.Error("Lorebook file must be 8 MB or smaller")
         with open(path, "r", encoding="utf-8-sig") as handle:
-            imported = import_book(json.load(handle), os.path.splitext(os.path.basename(path))[0])
-        updated = _copy(body)
-        updated.setdefault("books", []).append(imported)
-        return updated, gr.Dropdown(choices=book_choices(updated), value=imported["id"]), "Imported into draft"
+            import_book(json.load(handle), os.path.basename(path))
+        return load_all()
+
+    def move_missing_target(source_id, destination_id):
+        if not source_id or not destination_id:
+            raise gr.Error("Select both the missing target and its destination")
+        move_assignment_target(source_id, destination_id)
+        return load_all()
+
+    def remove_missing_target(target_id):
+        if not target_id:
+            raise gr.Error("Select a missing target first")
+        remove_assignment_target(target_id)
+        return load_all()
+
+    def remove_missing_reference(filename):
+        if not filename:
+            raise gr.Error("Select a missing file first")
+        remove_missing_file_reference(filename)
+        return load_all()
 
     book.change(select_book, [draft, book], [entry, *editor_outputs], show_progress="hidden")
     entry.change(select_entry, [draft, book, entry], editor_outputs, show_progress="hidden")
@@ -371,13 +479,21 @@ def build_lorebooks(gr: Any, *, load_config, save_config, import_book, i18n=None
         *assignment_agent_ids, *assignment_rows, *assignment_labels,
         *assignment_dropdowns, *assignment_summaries,
     ]
+    issue_outputs = [
+        active_preset, missing_files_text, missing_file,
+        missing_targets_text, missing_target, destination, book_errors_text,
+    ]
+    load_outputs = [
+        draft, *issue_outputs, book, entry, *editor_outputs, *assignment_outputs,
+        scan_depth, token_budget, case_sensitive, whole_words, recursive, status,
+    ]
 
     save_entry_event = save_entry_button.click(
         commit, [draft, book, entry, *editor_outputs], [draft, status])
     add_book_event = add_book_button.click(
         create_book, draft, [draft, book, entry, *editor_outputs])
     delete_book_event = delete_book_button.click(
-        remove_book, [draft, book], [draft, book, entry, *editor_outputs])
+        remove_book_file, book, load_outputs)
     add_entry_button.click(create_entry, [draft, book], [draft, entry, *editor_outputs])
     delete_entry_button.click(remove_entry, [draft, book, entry], [draft, entry, *editor_outputs])
     for agent_id, assigned, summary in zip(
@@ -391,11 +507,18 @@ def build_lorebooks(gr: Any, *, load_config, save_config, import_book, i18n=None
         apply,
         [draft, scan_depth, token_budget, case_sensitive, whole_words, recursive,
          *assignment_agent_ids, *assignment_dropdowns],
-        [draft, status],
+        load_outputs,
     )
-    import_event = import_file.change(import_json, [import_file, draft], [draft, book, status])
+    import_event = import_file.change(import_json, import_file, load_outputs)
+    refresh_event = refresh_button.click(load_all, None, load_outputs)
+    move_event = move_target_button.click(
+        move_missing_target, [missing_target, destination], load_outputs)
+    remove_target_event = remove_target_button.click(
+        remove_missing_target, missing_target, load_outputs)
+    remove_missing_event = remove_missing_file_button.click(
+        remove_missing_reference, missing_file, load_outputs)
 
-    for event in (save_entry_event, add_book_event, delete_book_event, import_event):
+    for event in (save_entry_event, add_book_event):
         event.then(
             assignment_control_values, draft, assignment_outputs,
             show_progress="hidden",
@@ -403,11 +526,14 @@ def build_lorebooks(gr: Any, *, load_config, save_config, import_book, i18n=None
 
     return {
         "load": load_all,
-        "load_outputs": [
-            draft, book, entry, *editor_outputs, *assignment_outputs,
-            scan_depth, token_budget, case_sensitive, whole_words, recursive, status,
-        ],
+        "load_outputs": load_outputs,
+        "full_refresh": load_all,
+        "full_refresh_outputs": load_outputs,
         "refresh": refresh_assignments,
         "refresh_inputs": [draft],
         "assignment_outputs": [draft, *assignment_outputs],
+        "events": [
+            refresh_event, delete_book_event, import_event, move_event,
+            remove_target_event, remove_missing_event,
+        ],
     }

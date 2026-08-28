@@ -72,8 +72,7 @@ def create_ui(server: Any, language: str = "ja"):
 
     def lore_config():
         prompts = server.active_prompt_setup()
-        agent_ids = [str(item["id"]) for item in prompts["steps"]] + ["writer"]
-        body = lorebook_store.load_config(agent_ids)
+        body = lorebook_store.load_config(prompts)
         body["agents"] = [
             {"id": item["id"], "name": item["name"], "step": item.get("step")}
             for item in prompts["steps"]
@@ -82,8 +81,22 @@ def create_ui(server: Any, language: str = "ja"):
 
     def save_lore_config(payload):
         prompts = server.active_prompt_setup()
-        agent_ids = [str(item["id"]) for item in prompts["steps"]] + ["writer"]
-        return lorebook_store.save_config(payload, agent_ids)
+        return lorebook_store.save_config(payload, prompts)
+
+    def move_lore_target(source_id, destination_id):
+        prompts = server.active_prompt_setup()
+        return lorebook_store.move_assignment_target(
+            prompts["preset_id"], source_id, destination_id, prompts)
+
+    def remove_lore_target(target_id):
+        prompts = server.active_prompt_setup()
+        return lorebook_store.remove_assignment_target(
+            prompts["preset_id"], target_id)
+
+    def remove_missing_lore_file(filename):
+        prompts = server.active_prompt_setup()
+        return lorebook_store.remove_missing_file_reference(
+            prompts["preset_id"], filename)
 
     def assistant_context():
         config = server.active_prompt_setup()
@@ -166,13 +179,20 @@ def create_ui(server: Any, language: str = "ja"):
                     server.DEFAULT_REASONING_STEPS, server.DEFAULT_WRITER, server.DEFAULT_SUMMARY,
                     get_debug=lambda: server.DEBUG_MODE,
                     set_debug=lambda enabled: setattr(server, "DEBUG_MODE", bool(enabled)),
+                    ensure_profile=lorebook_store.ensure_profile,
+                    rename_profile=lorebook_store.rename_profile,
                     i18n=tr,
                 )
 
             with gr.Tab(tr("lorebooks")) as lore_tab:
                 lore_ui = build_lorebooks(
                     gr, load_config=lore_config, save_config=save_lore_config,
-                    import_book=lorebook_store.import_sillytavern, i18n=tr,
+                    import_book=lorebook_store.import_book_file,
+                    delete_book_file=lorebook_store.delete_book_file,
+                    move_assignment_target=move_lore_target,
+                    remove_assignment_target=remove_lore_target,
+                    remove_missing_file_reference=remove_missing_lore_file,
+                    i18n=tr,
                 )
 
             with gr.Tab(tr("prompt_assistant")):
@@ -204,8 +224,8 @@ def create_ui(server: Any, language: str = "ja"):
         )
         demo.load(lore_ui["load"], None, lore_ui["load_outputs"])
         lore_tab.select(
-            lore_ui["refresh"], lore_ui["refresh_inputs"],
-            lore_ui["assignment_outputs"], show_progress="hidden",
+            lore_ui["full_refresh"], None,
+            lore_ui["full_refresh_outputs"], show_progress="hidden",
         )
         demo.load(assistant_ui["load"], None, assistant_ui["load_outputs"])
         prompt_ui.save_event.then(
@@ -218,6 +238,14 @@ def create_ui(server: Any, language: str = "ja"):
             prompt_ui.step_ui_outputs,
             show_progress="hidden",
         )
+        for identity_event in prompt_ui.identity_events:
+            identity_event.then(
+                lore_ui["full_refresh"], None, lore_ui["full_refresh_outputs"],
+                show_progress="hidden",
+            ).then(
+                assistant_ui["refresh"], assistant_ui["refresh_inputs"],
+                assistant_ui["load_outputs"], show_progress="hidden",
+            )
         main_test.click(test_connection, [main_url, main_key], main_test_status)
         logic_test.click(test_connection, [logic_url, logic_key], logic_test_status)
         provider_save.click(
