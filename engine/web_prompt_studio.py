@@ -110,6 +110,14 @@ def step_number_choices(enabled_values: Iterable[Any], number_values: Iterable[A
     ]
 
 
+@dataclass(frozen=True)
+class PresetDropdownState:
+    """Gradio-neutral description of a saved-preset dropdown update."""
+
+    choices: list[tuple[str, str]]
+    value: str
+
+
 class PromptStudioCallbacks:
     """Persistence callbacks shared by Gradio and unit tests."""
 
@@ -139,10 +147,13 @@ class PromptStudioCallbacks:
     def presets(self) -> list[tuple[str, str]]:
         return [(item["name"], item["filename"]) for item in prompt_store.list_presets()]
 
-    def save_preset(self, name: str, *values: Any) -> tuple[str, list[tuple[str, str]]]:
+    def save_preset(self, name: str, *values: Any) -> tuple[str, PresetDropdownState]:
         config = form_to_config(values)
         result = prompt_store.save_preset(name, **config)
-        return f"Saved preset: {result['filename']}", self.presets()
+        return (
+            f"Saved preset: {result['filename']}",
+            PresetDropdownState(self.presets(), result["filename"]),
+        )
 
     def load_preset(self, filename: str) -> tuple[Any, ...]:
         config = prompt_store.load_preset_file(
@@ -163,7 +174,7 @@ class PromptStudioCallbacks:
         result = prompt_store.save_preset(name, **config)
         return (
             f"Imported preset: {result['filename']}",
-            self.presets(),
+            PresetDropdownState(self.presets(), result["filename"]),
             *config_to_form(config),
         )
 
@@ -237,14 +248,14 @@ def build_prompt_studio(
 
     gr.Markdown(tr("prompt_studio_help"))
     with gr.Row():
+        debug = gr.Checkbox(value=callbacks.debug_state(), label=tr("debug_traces"))
+        save_button = gr.Button(tr("save_settings"), variant="primary")
+    with gr.Row():
         preset = gr.Dropdown(callbacks.presets(), label=tr("saved_presets"))
         preset_name = gr.Textbox(label=tr("preset_name"), placeholder="My preset")
         save_preset_button = gr.Button(tr("save_preset"))
         export_button = gr.Button(tr("export_csv"))
         import_file = gr.File(label=tr("import_csv"), file_types=[".csv"], type="filepath")
-    with gr.Row():
-        debug = gr.Checkbox(value=callbacks.debug_state(), label=tr("debug_traces"))
-        save_button = gr.Button(tr("save_settings"), variant="primary")
     status = gr.Markdown()
     export_file = gr.File(
         label=tr("exported_preset"), interactive=False,
@@ -311,6 +322,17 @@ def build_prompt_studio(
 
     form_outputs = list(form)
 
+    def preset_dropdown_update(state: PresetDropdownState):
+        return gr.update(choices=state.choices, value=state.value)
+
+    def save_preset(*values):
+        message, state = callbacks.save_preset(*values)
+        return message, preset_dropdown_update(state)
+
+    def import_preset(file_value):
+        message, state, *form_values = callbacks.import_preset(file_value)
+        return message, preset_dropdown_update(state), *form_values
+
     def refresh_step_ui(*step_values):
         enabled_values = step_values[:MAX_STEPS]
         number_values = step_values[MAX_STEPS:]
@@ -375,13 +397,13 @@ def build_prompt_studio(
     save_event = save_button.click(
         callbacks.save, inputs=form, outputs=[status, *form_outputs])
     save_preset_button.click(
-        callbacks.save_preset, inputs=[preset_name, *form], outputs=[status, preset])
+        save_preset, inputs=[preset_name, *form], outputs=[status, preset])
     preset_event = preset.change(
         callbacks.load_preset, inputs=preset, outputs=[status, *form_outputs])
     preset_event.then(refresh_step_ui, step_state_inputs, step_ui_outputs,
                       show_progress="hidden")
     import_event = import_file.change(
-        callbacks.import_preset, inputs=import_file,
+        import_preset, inputs=import_file,
         outputs=[status, preset, *form_outputs],
     )
     import_event.then(refresh_step_ui, step_state_inputs, step_ui_outputs,

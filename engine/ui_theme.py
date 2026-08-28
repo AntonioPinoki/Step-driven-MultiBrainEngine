@@ -135,6 +135,22 @@ CUSTOM_CSS = f"""
   fill: currentColor;
 }}
 
+/* Keep the generated CSV download in a compact, button-height row instead of
+   reserving the large drop-zone area used by interactive File components. */
+.brain-export-file,
+.brain-export-file > div,
+.brain-export-file [class*="file-preview"],
+.brain-export-file [class*="file-item"] {{
+  min-height: 0 !important;
+}}
+
+.brain-export-file > div,
+.brain-export-file [class*="file-preview"],
+.brain-export-file [class*="file-item"] {{
+  padding-top: 0.25rem !important;
+  padding-bottom: 0.25rem !important;
+}}
+
 .brain-editor textarea,
 .brain-log textarea,
 .brain-code textarea {{

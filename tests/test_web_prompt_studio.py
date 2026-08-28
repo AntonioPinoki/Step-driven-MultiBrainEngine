@@ -52,6 +52,19 @@ class PromptStudioFormTests(unittest.TestCase):
         save.assert_called_once()
         self.assertIn("Saved", result[0])
 
+    def test_save_preset_returns_choices_and_scalar_selected_value(self):
+        callbacks = web_prompt_studio.PromptStudioCallbacks([], WRITER, SUMMARY)
+        config = self.config()
+        presets = [("Sample", "sample.csv")]
+        with mock.patch.object(
+                prompt_store, "save_preset", return_value={"filename": "sample.csv"}), \
+                mock.patch.object(callbacks, "presets", return_value=presets):
+            message, state = callbacks.save_preset(
+                "Sample", *web_prompt_studio.config_to_form(config))
+        self.assertIn("Saved", message)
+        self.assertEqual(state.choices, presets)
+        self.assertEqual(state.value, "sample.csv")
+
     def test_import_and_export_csv(self):
         callbacks = web_prompt_studio.PromptStudioCallbacks([], WRITER, SUMMARY)
         config = self.config()
@@ -65,6 +78,7 @@ class PromptStudioFormTests(unittest.TestCase):
                     mock.patch.object(prompt_store, "list_presets", return_value=[]):
                 imported = callbacks.import_preset(source)
             self.assertIn("Imported", imported[0])
+            self.assertEqual(imported[1].value, "sample.csv")
             restored = web_prompt_studio.form_to_config(imported[2:])
             self.assertEqual(restored["steps"][0]["prompt"], "Think.")
             self.assertEqual(restored["writer"], config["writer"])

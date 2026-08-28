@@ -66,6 +66,8 @@ class UiThemeTests(unittest.TestCase):
         self.assertIn('[role="tab"]:hover', CUSTOM_CSS)
         self.assertIn(".brain-dashboard-card code", CUSTOM_CSS)
         self.assertIn(".brain-export-file", CUSTOM_CSS)
+        self.assertIn('brain-export-file [class*="file-preview"]', CUSTOM_CSS)
+        self.assertIn("min-height: 0 !important", CUSTOM_CSS)
         self.assertIn("width: calc(100vw - 2rem) !important", CUSTOM_CSS)
         self.assertIn('[role="tabpanel"]', CUSTOM_CSS)
 
