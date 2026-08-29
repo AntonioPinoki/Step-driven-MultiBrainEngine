@@ -142,6 +142,7 @@ class PromptStudioCallbacks:
         ensure_profile: Callable[..., Any] | None = None,
         rename_profile: Callable[[str, str], Any] | None = None,
         active_preset_text: str = "Active preset",
+        default_group_prompt: str = "",
     ) -> None:
         self.default_steps = default_steps
         self.default_writer = default_writer
@@ -151,18 +152,26 @@ class PromptStudioCallbacks:
         self.ensure_profile = ensure_profile or (lambda *args, **kwargs: None)
         self.rename_profile = rename_profile or (lambda *args, **kwargs: None)
         self.active_preset_text = active_preset_text
+        self.default_group_prompt = default_group_prompt
 
     def load(self) -> tuple[Any, ...]:
-        return config_to_form(prompt_store.load_config(
-            self.default_steps, self.default_writer, self.default_summary))
+        return config_to_form(prompt_store.load_available_config(
+            self.default_steps, self.default_writer, self.default_summary,
+            self.default_group_prompt))
 
     def save(self, *values: Any) -> tuple[Any, ...]:
         config = form_to_config(values)
-        saved = prompt_store.save_config(**config)
-        return ("Saved Prompt Studio settings.", *config_to_form(saved))
+        saved = prompt_store.save_active_preset_config(**config)
+        return ("Saved Prompt Studio settings and active preset CSV.", *config_to_form(saved))
 
     def presets(self) -> list[tuple[str, str]]:
         return [(item["name"], item["filename"]) for item in prompt_store.list_presets()]
+
+    def active_filename(self, config: dict[str, Any]) -> str | None:
+        return next((
+            item["filename"] for item in prompt_store.list_presets()
+            if item.get("preset_id") == config.get("preset_id")
+        ), None)
 
     def require_unused_name(self, name: str) -> str:
         return prompt_store.require_unused_preset_name(name)
@@ -202,9 +211,14 @@ class PromptStudioCallbacks:
             *config_to_form(config))
 
     def new_preset(self, name: str) -> tuple[Any, ...]:
-        display_name = self.require_unused_name(name)
+        display_name = (
+            self.require_unused_name(name)
+            if str(name or "").strip()
+            else self.unique_import_name("New preset")
+        )
         config = prompt_store.validate_config(
             self.default_steps, self.default_writer, self.default_summary,
+            self.default_group_prompt,
             preset_name=display_name)
         config.pop("preset_id", None)
         config.pop("preset_name", None)
@@ -314,6 +328,7 @@ def build_prompt_studio(
     default_writer: dict[str, Any],
     default_summary: dict[str, Any],
     *,
+    default_group_prompt: str = "",
     get_debug: Callable[[], bool] | None = None,
     set_debug: Callable[[bool], Any] | None = None,
     ensure_profile: Callable[..., Any] | None = None,
@@ -329,8 +344,10 @@ def build_prompt_studio(
 
     callbacks = PromptStudioCallbacks(
         default_steps, default_writer, default_summary, get_debug, set_debug,
-        ensure_profile, rename_profile, tr("lorebook.current_preset"))
-    initial = prompt_store.load_config(default_steps, default_writer, default_summary)
+        ensure_profile, rename_profile, tr("lorebook.current_preset"),
+        default_group_prompt)
+    initial = prompt_store.load_available_config(
+        default_steps, default_writer, default_summary, default_group_prompt)
     initial_values = iter(config_to_form(initial))
     form: list[Any] = []
 
@@ -340,7 +357,9 @@ def build_prompt_studio(
         debug = gr.Checkbox(value=callbacks.debug_state(), label=tr("debug_traces"))
         save_button = gr.Button(tr("save_settings"), variant="primary")
     with gr.Row():
-        preset = gr.Dropdown(callbacks.presets(), label=tr("saved_presets"))
+        preset = gr.Dropdown(
+            callbacks.presets(), value=callbacks.active_filename(initial),
+            label=tr("saved_presets"))
         preset_name = gr.Textbox(label=tr("preset_name"), placeholder="My preset")
         new_preset_button = gr.Button(tr("prompt_studio.new_preset"))
         save_preset_button = gr.Button(tr("prompt_studio.save_as"))

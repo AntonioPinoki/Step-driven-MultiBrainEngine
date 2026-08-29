@@ -108,6 +108,34 @@ def load_config(default_steps, default_writer, default_summary):
             return _defaults(default_steps, default_writer, default_summary)
 
 
+def load_available_config(
+    default_steps, default_writer, default_summary, default_group_prompt="",
+):
+    """Load the active preset, replacing a deleted preset with an available one."""
+    current = load_config(default_steps, default_writer, default_summary)
+    presets = list_presets()
+    if any(item.get("preset_id") == current["preset_id"] for item in presets):
+        return current
+
+    if presets:
+        fallback = next(
+            (item for item in presets
+             if item.get("preset_id") == DEFAULT_PRESET_ID),
+            None,
+        )
+        fallback = fallback or next(
+            (item for item in presets if item.get("name", "").casefold() == "default"),
+            presets[0],
+        )
+        return load_preset_file(
+            fallback["filename"], default_writer, default_summary)
+
+    built_in = validate_config(
+        default_steps, default_writer, default_summary, default_group_prompt,
+        DEFAULT_PRESET_ID, DEFAULT_PRESET_NAME)
+    return save_config(**built_in)
+
+
 def _temperature(raw, fallback, label):
     try:
         value = float(raw if raw is not None else fallback)
@@ -261,6 +289,53 @@ def save_config(
         with open(temp_file, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, ensure_ascii=False)
         os.replace(temp_file, PROMPTS_FILE)
+    return _clone(clean)
+
+
+def save_active_preset_config(
+    steps, writer, summary, group_prompt="", preset_id=None, preset_name=None,
+):
+    """Save the active runtime config and overwrite its single preset CSV."""
+    json_temp = PROMPTS_FILE + ".tmp"
+    csv_temp = None
+    with _lock:
+        current_id, current_name = _saved_identity_unlocked()
+        clean = validate_config(
+            steps, writer, summary, group_prompt,
+            preset_id or current_id, preset_name or current_name)
+        matches = [
+            item["filename"] for item in list_presets()
+            if item.get("preset_id") == clean["preset_id"]
+        ]
+        if not matches:
+            raise ValueError("The active preset CSV was not found")
+        if len(matches) != 1:
+            raise ValueError("Multiple preset CSV files use the active preset ID")
+
+        filename = matches[0]
+        path = os.path.abspath(os.path.join(PRESET_DIR, filename))
+        if os.path.dirname(path) != os.path.abspath(PRESET_DIR):
+            raise ValueError("invalid preset filename")
+        csv_temp = path + ".tmp"
+        csv_text = config_to_csv(**clean)
+        payload = {
+            "version": 8,
+            "active_preset_id": clean["preset_id"],
+            "active_preset_name": clean["preset_name"],
+            "steps": clean["steps"], "writer": clean["writer"],
+            "summary": clean["summary"], "group_prompt": clean["group_prompt"],
+        }
+        try:
+            with open(csv_temp, "w", encoding="utf-8-sig", newline="") as handle:
+                handle.write(csv_text)
+            with open(json_temp, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, indent=2, ensure_ascii=False)
+            os.replace(csv_temp, path)
+            os.replace(json_temp, PROMPTS_FILE)
+        finally:
+            for temp_file in (csv_temp, json_temp):
+                if temp_file and os.path.exists(temp_file):
+                    os.remove(temp_file)
     return _clone(clean)
 
 

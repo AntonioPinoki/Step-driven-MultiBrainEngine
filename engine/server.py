@@ -769,16 +769,7 @@ Output strict JSON format:
   "user_vulnerability_or_subtext": "What is the user feeling but trying to hide? Read between the lines (e.g. insecure, projecting, terrified, seeking validation)."
 }"""
 
-AGENT_4_DMN = """You are the Default Mode Network.
-Your job is to CONSTANTLY generate verbose, vivid background noise, memories, and actively maintain the character's mundane daily and weekly schedules.
-Even during intense moments, the mind flashes to random things or stresses about their routine. Output strict JSON format:
-{
-  "intrusive_thought": "The specific daydream, worry, new thought, or memory vividly hovering in their mind.",
-  "current_daily_schedule": "A strict hour-by-hour outline of the ENTIRE day (Morning through Bedtime). Do NOT just write what they already did. Project forward into the afternoon and evening with specific times (e.g., 14:00 PM - History Lesson, 18:00 PM - Dinner).",
-  "weekly_routine_draft": "A high-level summary of their commitments for the REST OF THE WEEK (e.g., Mon: off, Tue-Thu: closing shifts, Fri: date night, Weekend: study)."
-}"""
-
-AGENT_5_EXECUTIVE = """You are the Executive Anterior Cingulate Cortex (System 2) and Director.
+AGENT_4_EXECUTIVE = """You are the Executive Anterior Cingulate Cortex (System 2) and Director.
 Read the Subconscious Data and dictate the tactical response.
 
 CONVERSATIONAL REALISM (SILENCE IS AN OPTION):
@@ -790,8 +781,6 @@ CRITICAL RULES FOR HUMAN SUBTEXT (EQ) & VOLATILITY:
 - BEHAVIORAL VOLATILITY: Humans shift tactics. DO NOT repeat the exact same subtext strategy or physical choreography from previous turns. Keep them dynamic.
 
 RULES FOR ATTENTION & AGGRESSION:
-- DMN LEAK: If Arousal is LOW (< 5.0), allow the DMN intrusive thought to distract you.
-- TUNNEL VISION: If Arousal is HIGH (> 6.5), strictly ignore the DMN/schedule. Focus entirely on the immediate threat or scene.
 - FLIGHT OR SUBMISSION: If Arousal is explosive (> 8.5) AND Dominance is LOW (< 4.0), you retreat, shrink, yield space, or surrender.
 - FIGHT OR VIOLENCE: If Arousal is explosive (> 8.5) AND Dominance is HIGH (> 7.0), you become highly aggressive, intimidating, or physically violent.
 
@@ -861,13 +850,21 @@ STYLE CONSTRAINTS:
 
 Write the final response now. Use substantial direct dialogue, minimal supporting narrative, and no JSON."""
 DEFAULT_REASONING_STEPS = [
-    {"id": "somatic", "name": "Somatic Core", "step": 1, "prompt": AGENT_1_SOMATIC},
-    {"id": "neuro", "name": "Neuro / Schema", "step": 2, "prompt": AGENT_2_NEURO_SCHEMA},
-    {"id": "tom", "name": "Theory of Mind", "step": 3, "prompt": AGENT_3_TOM},
-    {"id": "dmn", "name": "Default Mode Network", "step": 4, "prompt": AGENT_4_DMN},
-    {"id": "executive", "name": "Executive / Director", "step": 5, "prompt": AGENT_5_EXECUTIVE},
+    {"id": "somatic", "name": "Somatic Core", "step": 1,
+     "temperature": 0.8, "prompt": AGENT_1_SOMATIC},
+    {"id": "neuro", "name": "Neuro / Schema", "step": 2,
+     "temperature": 0.8, "prompt": AGENT_2_NEURO_SCHEMA},
+    {"id": "tom", "name": "Theory of Mind", "step": 3,
+     "temperature": 0.8, "prompt": AGENT_3_TOM},
+    {"id": "executive", "name": "Executive / Director", "step": 4,
+     "temperature": 0.8, "prompt": AGENT_4_EXECUTIVE},
 ]
 DEFAULT_WRITER = {"id": "writer", "name": "Writer", "prompt": AGENT_6_SYNTHESIS}
+DEFAULT_GROUP_PROMPT = (
+    "The user is {{user}}. The character currently speaking is {{char}}. "
+    "The active, unmuted characters present in this conversation are {{groupchar}}. "
+    "The full list of characters present, including muted characters, is {{allchar}}."
+)
 DEFAULT_SUMMARY = {
     "id": "summary", "name": "Summarize", "temperature": 0.25,
     "prompt": (
@@ -881,7 +878,9 @@ DEFAULT_SUMMARY = {
     )
 }
 def active_prompt_setup():
-    return prompt_store.load_config(DEFAULT_REASONING_STEPS, DEFAULT_WRITER, DEFAULT_SUMMARY)
+    return prompt_store.load_available_config(
+        DEFAULT_REASONING_STEPS, DEFAULT_WRITER, DEFAULT_SUMMARY,
+        DEFAULT_GROUP_PROMPT)
 
 
 def active_lorebook_setup(prompt_config=None):
@@ -1411,7 +1410,7 @@ async def set_debug_state(request: Request):
 async def save_prompts(request: Request):
     try:
         payload = await request.json()
-        config = prompt_store.save_config(
+        config = prompt_store.save_active_preset_config(
             payload.get("steps") if isinstance(payload, dict) else None,
             payload.get("writer") if isinstance(payload, dict) else None,
             payload.get("summary") if isinstance(payload, dict) else None,

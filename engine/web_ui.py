@@ -181,6 +181,7 @@ def create_ui(server: Any, language: str = "ja"):
             with gr.Tab(tr("prompt_studio")) as prompt_tab:
                 prompt_ui = build_prompt_studio(
                     server.DEFAULT_REASONING_STEPS, server.DEFAULT_WRITER, server.DEFAULT_SUMMARY,
+                    default_group_prompt=server.DEFAULT_GROUP_PROMPT,
                     get_debug=lambda: server.DEBUG_MODE,
                     set_debug=lambda enabled: setattr(server, "DEBUG_MODE", bool(enabled)),
                     ensure_profile=lorebook_store.ensure_profile,

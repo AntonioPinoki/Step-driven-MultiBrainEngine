@@ -63,6 +63,9 @@ class PresetApiTests(unittest.TestCase):
                 source = prompt_store.save_config(
                     [step()], writer(), summary(),
                     preset_id="preset_source", preset_name="Source")
+                prompt_store.save_preset(
+                    "Source", [step()], writer(), summary(),
+                    preset_id="preset_source", preset_name="Source")
                 lorebook_store.import_book_file(world(), "World.json")
                 lorebook_store.save_config({
                     "settings": {},
@@ -111,6 +114,22 @@ class PresetApiTests(unittest.TestCase):
                     ["World.json"],
                     lorebook_store.load_config(body)["assignments"]["step_alpha"],
                 )
+
+                updated_step = {**step(), "prompt": "Updated through the API."}
+                updated = client.post("/api/prompts", json={
+                    "steps": [updated_step],
+                    "writer": writer(), "summary": summary(),
+                    "group_prompt": "Updated group",
+                })
+                self.assertEqual(200, updated.status_code, updated.text)
+                with open(
+                    os.path.join(preset_dir, body["filename"]),
+                    "r", encoding="utf-8-sig", newline="",
+                ) as handle:
+                    stored = prompt_store.csv_to_config(
+                        handle.read(), writer(), summary())
+                self.assertEqual("Updated through the API.", stored["steps"][0]["prompt"])
+                self.assertEqual("Updated group", stored["group_prompt"])
 
 
 if __name__ == "__main__":

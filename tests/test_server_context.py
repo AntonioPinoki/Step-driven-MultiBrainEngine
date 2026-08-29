@@ -36,6 +36,14 @@ class ConnectorBindingTests(unittest.TestCase):
     def tearDown(self):
         server.PENDING_SILLYTAVERN_CONTEXTS.clear()
 
+    def test_new_preset_defaults_have_four_steps_at_temperature_point_eight(self):
+        steps = server.DEFAULT_REASONING_STEPS
+
+        self.assertEqual([1, 2, 3, 4], [item["step"] for item in steps])
+        self.assertNotIn("dmn", [item["id"] for item in steps])
+        self.assertEqual([0.8, 0.8, 0.8, 0.8], [item["temperature"] for item in steps])
+        self.assertNotIn("schedule", steps[-1]["prompt"].lower())
+
     def test_only_matching_snapshot_is_claimed(self):
         server.PENDING_SILLYTAVERN_CONTEXTS.extend([
             snapshot("chat-a", "Alpha", "Alice", "continue"),
