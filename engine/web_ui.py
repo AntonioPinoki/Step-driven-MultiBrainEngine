@@ -13,6 +13,10 @@ from web_lorebooks import build_lorebooks
 from web_prompt_assistant import build_prompt_assistant
 from web_prompt_studio import build_prompt_studio
 
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+FAVICON_PATH = os.path.join(PROJECT_ROOT, "icon.png")
+FAVICON_HEAD = '<link rel="icon" type="image/png" href="/favicon.ico">'
+
 
 def create_ui(server: Any, language: str = "ja"):
     import gradio as gr
@@ -269,7 +273,11 @@ def create_ui(server: Any, language: str = "ja"):
 
 def mount(fastapi_app, server):
     import gradio as gr
-    from fastapi.responses import RedirectResponse
+    from fastapi.responses import FileResponse, RedirectResponse
+
+    @fastapi_app.get("/favicon.ico", include_in_schema=False)
+    async def favicon():
+        return FileResponse(FAVICON_PATH, media_type="image/png")
 
     @fastapi_app.get("/", include_in_schema=False)
     async def web_root():
@@ -281,11 +289,11 @@ def mount(fastapi_app, server):
         return RedirectResponse("/ui/ja/")
 
     mounted = fastapi_app
-    allowed = [os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Preset"))]
+    allowed = [os.path.join(PROJECT_ROOT, "Preset")]
     for code in ui_text.SUPPORTED_LANGUAGES:
         mounted = gr.mount_gradio_app(
             mounted, create_ui(server, code), path=f"/ui/{code}",
             allowed_paths=allowed, theme=ui_theme.create_theme(), css=ui_theme.CUSTOM_CSS,
-            footer_links=[], show_error=True,
+            footer_links=[], show_error=True, head=FAVICON_HEAD,
         )
     return mounted
