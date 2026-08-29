@@ -97,6 +97,25 @@ CUSTOM_CSS = f"""
 .brain-status-warning {{ color: var(--brain-warning) !important; }}
 .brain-status-error {{ color: var(--brain-danger) !important; }}
 
+/* Gradio error toasts use the page's light text variable even when their
+   surface is light. Keep error notifications readable in this dark theme. */
+.toast-body.error {{
+  background: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #20241c !important;
+}}
+
+.toast-body.error .toast-title,
+.toast-body.error .toast-count,
+.toast-body.error .toast-message-text,
+.toast-body.error .toast-close {{
+  color: #20241c !important;
+}}
+
+.toast-body.error .toast-icon {{
+  color: #b42318 !important;
+}}
+
 /* Tabs use a light hover surface in Gradio 6. Keep its label readable. */
 [role="tab"]:hover {{
   color: #20241c !important;

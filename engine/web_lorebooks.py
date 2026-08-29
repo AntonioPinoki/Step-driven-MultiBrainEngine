@@ -151,18 +151,6 @@ def build_lorebooks(
         active_preset = gr.Markdown("")
         refresh_button = gr.Button(tr("lorebook.refresh_books"), scale=1)
     status = gr.Markdown("")
-    with gr.Accordion(tr("lorebook.missing_and_errors"), open=False):
-        missing_files_text = gr.Markdown("")
-        with gr.Row():
-            missing_file = gr.Dropdown(label=tr("lorebook.missing_files"))
-            remove_missing_file_button = gr.Button(tr("lorebook.remove_missing_reference"))
-        missing_targets_text = gr.Markdown("")
-        with gr.Row():
-            missing_target = gr.Dropdown(label=tr("lorebook.missing_targets"))
-            destination = gr.Dropdown(label=tr("lorebook.destination"))
-            move_target_button = gr.Button(tr("lorebook.move_assignment"))
-            remove_target_button = gr.Button(tr("lorebook.remove_assignment"))
-        book_errors_text = gr.Markdown("")
     with gr.Accordion(tr("global_settings"), open=False):
         with gr.Row():
             scan_depth = gr.Number(value=2, precision=0, minimum=1, maximum=1000, label=tr("scan_depth"))
@@ -207,6 +195,19 @@ def build_lorebooks(
                 assignment_summaries.append(summary)
 
     apply_button = gr.Button(tr("apply_lorebooks"), variant="primary")
+
+    with gr.Accordion(tr("lorebook.missing_and_errors"), open=False):
+        missing_files_text = gr.Markdown("")
+        with gr.Row():
+            missing_file = gr.Dropdown(label=tr("lorebook.missing_files"))
+            remove_missing_file_button = gr.Button(tr("lorebook.remove_missing_reference"))
+        missing_targets_text = gr.Markdown("")
+        with gr.Row():
+            missing_target = gr.Dropdown(label=tr("lorebook.missing_targets"))
+            destination = gr.Dropdown(label=tr("lorebook.destination"))
+            move_target_button = gr.Button(tr("lorebook.move_assignment"))
+            remove_target_button = gr.Button(tr("lorebook.remove_assignment"))
+        book_errors_text = gr.Markdown("")
 
     with gr.Row():
         book = gr.Dropdown(label=tr("lorebook"), choices=[], scale=2)

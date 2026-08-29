@@ -14,7 +14,7 @@ from web_prompt_assistant import build_prompt_assistant
 from web_prompt_studio import build_prompt_studio
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-FAVICON_PATH = os.path.join(PROJECT_ROOT, "icon.png")
+FAVICON_PATH = os.path.join(os.path.dirname(__file__), "icon.png")
 FAVICON_HEAD = '<link rel="icon" type="image/png" href="/favicon.ico">'
 
 
