@@ -108,6 +108,23 @@ def _sillytavern_lore_scan_context(character, user):
     return "\n".join(value for value in values if isinstance(value, str) and value.strip())
 
 
+def _snapshot_match_text(text, role):
+    """Normalize transport-only differences before matching an ST snapshot."""
+    if not isinstance(text, str):
+        return None
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    if role == "assistant":
+        # SillyTavern may keep reasoning outside ``chat[].mes`` while restoring
+        # it as a think block in the OpenAI-compatible completion request.
+        normalized = re.sub(
+            r"<think\b[^>]*>.*?</think>\s*",
+            "",
+            normalized,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+    return normalized.strip()
+
+
 def _snapshot_matches_request(context, data, raw_messages):
     chat = context.get("chat") if isinstance(context, dict) else None
     chat = chat if isinstance(chat, dict) else {}
@@ -123,12 +140,16 @@ def _snapshot_matches_request(context, data, raw_messages):
     expected_text = latest.get("text")
     if expected_role not in {"user", "assistant"} or not isinstance(expected_text, str):
         return False
+    expected_text = _snapshot_match_text(expected_text, expected_role)
     candidates = [
         message for message in (raw_messages if isinstance(raw_messages, list) else [])
         if isinstance(message, dict) and message.get("role") == expected_role
         and isinstance(message.get("content"), str)
     ]
-    return any(message["content"] == expected_text for message in candidates[-4:])
+    return any(
+        _snapshot_match_text(message["content"], expected_role) == expected_text
+        for message in candidates[-4:]
+    )
 
 
 def claim_sillytavern_role_binding(
@@ -155,6 +176,20 @@ def claim_sillytavern_role_binding(
         context for context in fresh
         if _snapshot_matches_request(context, data, raw_messages)
     ]
+    if not matches and len(fresh) == 1:
+        # SillyTavern's browser-side /generate request carries ``type``, but
+        # its backend may omit that field when forwarding the OpenAI-compatible
+        # request. Continue messages can also be represented differently after
+        # reasoning is restored. A single fresh, unclaimed Continue snapshot is
+        # therefore a safe operation-level fallback; ambiguity still fails
+        # closed when two or more snapshots are pending.
+        only_context = fresh[0]
+        only_generation = only_context.get("generation") or {}
+        if str(only_generation.get("type") or "").strip().lower() == "continue":
+            matches = [only_context]
+            progress_log(
+                "ℹ️ Continue context claimed by unique fresh-snapshot fallback."
+            )
     if len(matches) != 1:
         return None
     context = matches[0]
@@ -1079,10 +1114,15 @@ def request_role_binding(data, raw_messages, connector_binding=None):
     prompt-pattern character detection. Stable generic names are the final
     fallback so supported macros never leak into model prompts.
     """
+    data = data if isinstance(data, dict) else {}
     if connector_binding:
         return connector_binding
 
-    data = data if isinstance(data, dict) else {}
+    # SillyTavern includes the operation type in the completion request itself.
+    # Preserve Continue behavior even when its supplemental connector snapshot
+    # cannot be claimed (for example, due to reasoning/content representation
+    # differences). Other operation types retain the normal reasoning chain.
+    request_type = str(data.get("type") or "").strip().lower()
     user_name = (
         _safe_display_name(data.get("user_name"))
         or _latest_message_name(raw_messages, "user")
@@ -1100,7 +1140,7 @@ def request_role_binding(data, raw_messages, connector_binding=None):
         "user_name": user_name,
         "char_name": character_name,
         "chat_id": "",
-        "generation_type": "normal",
+        "generation_type": "continue" if request_type == "continue" else "normal",
         "is_group": False,
         "lore_scan_context": "",
     }
