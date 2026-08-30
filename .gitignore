@@ -23,6 +23,9 @@ Lorebooks/settings.json
 # Local Python environment
 .venv/
 
+# Local launcher
+start_brainengine.bat
+
 # SillyTavern itself is an external application.  Only the independent
 # extension snapshot in SillyTavern-extention/extensions is versioned here.
 SillyTavern-extention/SillyTavern/
