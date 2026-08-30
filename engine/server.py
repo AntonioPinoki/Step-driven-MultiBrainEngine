@@ -185,10 +185,11 @@ def claim_sillytavern_role_binding(
         # closed when two or more snapshots are pending.
         only_context = fresh[0]
         only_generation = only_context.get("generation") or {}
-        if str(only_generation.get("type") or "").strip().lower() == "continue":
+        fallback_type = str(only_generation.get("type") or "").strip().lower()
+        if fallback_type in {"continue", "impersonate"}:
             matches = [only_context]
             progress_log(
-                "ℹ️ Continue context claimed by unique fresh-snapshot fallback."
+                f"ℹ️ {fallback_type} context claimed by unique fresh-snapshot fallback."
             )
     if len(matches) != 1:
         return None
@@ -1123,6 +1124,9 @@ def request_role_binding(data, raw_messages, connector_binding=None):
     # cannot be claimed (for example, due to reasoning/content representation
     # differences). Other operation types retain the normal reasoning chain.
     request_type = str(data.get("type") or "").strip().lower()
+    generation_type = (
+        request_type if request_type in {"continue", "impersonate"} else "normal"
+    )
     user_name = (
         _safe_display_name(data.get("user_name"))
         or _latest_message_name(raw_messages, "user")
@@ -1140,7 +1144,7 @@ def request_role_binding(data, raw_messages, connector_binding=None):
         "user_name": user_name,
         "char_name": character_name,
         "chat_id": "",
-        "generation_type": "continue" if request_type == "continue" else "normal",
+        "generation_type": generation_type,
         "is_group": False,
         "lore_scan_context": "",
     }
@@ -1298,6 +1302,105 @@ async def summary_response(data, raw_messages, summary_config, request=None):
         "choices": [{
             "index": 0,
             "message": {"role": "assistant", "content": prefix + summary_text},
+            "finish_reason": "stop",
+        }],
+    }
+
+
+def impersonation_api_args(data):
+    """Keep ST's standard generation controls for a transparent direct call."""
+    args = {}
+    numeric_fields = {
+        "temperature": float,
+        "top_p": float,
+        "frequency_penalty": float,
+        "presence_penalty": float,
+        "max_tokens": int,
+    }
+    for field, converter in numeric_fields.items():
+        value = data.get(field)
+        if value is None or value == "":
+            continue
+        try:
+            args[field] = converter(value)
+        except (TypeError, ValueError):
+            continue
+    if isinstance(data.get("stop"), (str, list)):
+        args["stop"] = data["stop"]
+    args.setdefault("max_tokens", 2000)
+    return args
+
+
+async def impersonation_response(data, raw_messages, request=None):
+    """Proxy an ST impersonation prompt directly to the main model."""
+    api_args = impersonation_api_args(data)
+    extra_headers = {
+        "HTTP-Referer": "http://localhost:8000",
+        "X-Title": "BrainEngine2 Impersonate",
+    }
+
+    if data.get("stream"):
+        async def impersonation_stream():
+            stream = None
+            emitted = False
+            try:
+                stream = await writer_client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=copy.deepcopy(raw_messages),
+                    stream=True,
+                    extra_headers=extra_headers,
+                    **api_args,
+                )
+                async for part in _stream_with_timeout(stream, STREAM_STALL_TIMEOUT):
+                    if not part.choices:
+                        continue
+                    delta = part.choices[0].delta.content or ""
+                    if delta:
+                        emitted = True
+                        yield _sse_chunk(delta)
+            except Exception as exc:
+                print(f"⚠️ Impersonate stream failed: {exc}")
+            finally:
+                if stream is not None:
+                    await stream.close()
+            if not emitted:
+                yield _sse_chunk("...")
+            yield _sse_final()
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(
+            impersonation_stream(), media_type="text/event-stream"
+        )
+
+    final_text = "..."
+    for attempt in range(3):
+        try:
+            response = await _await_upstream(
+                writer_client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=copy.deepcopy(raw_messages),
+                    extra_headers=extra_headers,
+                    **api_args,
+                ),
+                request,
+            )
+            final_text = response.choices[0].message.content or ""
+            if not final_text.strip():
+                raise ValueError("Impersonate generation returned an empty response")
+            break
+        except ClientDisconnected:
+            raise
+        except Exception as exc:
+            print(f"⚠️ Impersonate API Error on attempt {attempt + 1}: {exc}")
+            if attempt < 2:
+                await asyncio.sleep(2)
+
+    return {
+        "id": "chatcmpl-brainengine-impersonate",
+        "object": "chat.completion",
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": final_text},
             "finish_reason": "stop",
         }],
     }
@@ -1728,6 +1831,10 @@ async def chat_completions(request: Request):
         return await summary_response(data, raw_messages, summary_config, request)
 
     role_binding = request_role_binding(data, raw_messages, connector_binding)
+    if role_binding.get("generation_type") == "impersonate":
+        progress_log("🎭 Impersonate generation mode: direct main-model request.")
+        return await impersonation_response(data, raw_messages, request)
+
     char_name = role_binding["char_name"]
     is_continue = bool(role_binding and role_binding["generation_type"] == "continue")
     pinned_summary = extract_pinned_summary(raw_messages)
