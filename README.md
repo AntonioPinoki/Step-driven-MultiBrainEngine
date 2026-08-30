@@ -44,7 +44,13 @@ py -m venv .venv
 
 ## 起動
 
-`start_brainengine.bat`を実行します。サーバーの起動後、コントロール画面がブラウザで開きます。
+このプロジェクトの起動入口は`engine\start_web_ui.py`です。プロジェクト直下で次のコマンドを実行します。
+
+```powershell
+.venv\Scripts\python.exe engine\start_web_ui.py
+```
+
+サーバーの起動後、コントロール画面がブラウザで開きます。
 
 ```text
 http://127.0.0.1:8001/ui/
