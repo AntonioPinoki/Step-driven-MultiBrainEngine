@@ -560,7 +560,7 @@ def build_agent_messages(base_messages, agent_prompt, additional_context="", is_
         msgs.append({"role": "user", "content": directive})
     else:
         directive = (
-            "===== BRAINENGINE CONTROL DIRECTIVE =====\n"
+            "<BE>\n"
             "CHANNEL: SYSTEM ORCHESTRATION\n"
             "This is not dialogue, narration, an action, or a message from the roleplay participant.\n"
             "Do not answer this control message as if a character said it.\n"
@@ -569,7 +569,7 @@ def build_agent_messages(base_messages, agent_prompt, additional_context="", is_
         )
         if additional_context:
             directive += f"\n{additional_context}\n"
-        directive += "\n===== END BRAINENGINE CONTROL DIRECTIVE ====="
+        directive += "\n</BE>"
         # Normal turns end with this fresh user-role control message. Continue
         # turns place it before the response being extended; SillyTavern's
         # trailing continue nudge still leaves the request generation-ready.
@@ -597,7 +597,7 @@ def build_agent_messages(base_messages, agent_prompt, additional_context="", is_
 def build_reasoning_messages(base_messages, prompt, prior_context=""):
     msgs = copy.deepcopy(base_messages)
     directive = (
-        "===== BRAINENGINE CONTROL DIRECTIVE =====\n"
+        "<BE>\n"
         "CHANNEL: PRIVATE REASONING\n"
         "This is not a roleplay message and was not spoken by the participant.\n"
         f"[INTERNAL REASONING STEP]\n{prompt}\n"
@@ -606,7 +606,7 @@ def build_reasoning_messages(base_messages, prompt, prior_context=""):
         directive += f"\n[OUTPUTS FROM EARLIER STEPS]\n{prior_context}\n"
     directive += (
         "\nReturn only this step's analysis. Do not write the final roleplay reply.\n"
-        "===== END BRAINENGINE CONTROL DIRECTIVE ====="
+        "</BE>"
     )
     msgs.append({"role": "user", "content": directive})
     return msgs
@@ -1714,12 +1714,12 @@ async def chat_completions(request: Request):
         setting_messages.append({
             "role": "user",
             "content": (
-                "===== BRAINENGINE CONTROL DIRECTIVE =====\n"
+                "<BE>\n"
                 "CHANNEL: SYSTEM ORCHESTRATION\n"
                 "This is not dialogue, narration, an action, or a message from the roleplay participant.\n"
                 "Generate the Setting narrator's next continuation from the established conversation.\n"
                 "Output only that continuation.\n"
-                "===== END BRAINENGINE CONTROL DIRECTIVE ====="
+                "</BE>"
             ),
         })
 

@@ -3,6 +3,3 @@ fastapi==0.140.0
 uvicorn==0.51.0
 openai==2.48.0
 gradio==6.25.0
-
-# Required by FastAPI's TestClient in the test suite
-httpx==0.28.1
