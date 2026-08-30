@@ -128,7 +128,6 @@ Prompt Studioには、通常の推論チェーンとは独立したSummarization
 
 ## データと記憶
 
-BrainEngineは独自の永続的なキャラクター記憶データベースを持ちません。会話履歴は接続元のクライアントが管理します。
 
 応答に含まれた直近の短い思考スナップショットは、会話履歴を通じて短期的な連続性に使用できます。また、SillyTavern連携拡張から受け取るコンテキストとPromptAssistantの一時指示はメモリ上だけに保持され、BrainEngineの再起動時に消去されます。
 
@@ -140,7 +139,6 @@ engine/prompts.json      現在有効なプロンプト設定
 Preset/                  CSVプリセット
 Lorebooks/books/         Lorebook JSON
 Lorebooks/settings.json  Lorebookの設定と割り当て
-debug/                   Debug traces有効時の記録
 ```
 
 ## プロジェクト構成
@@ -150,7 +148,6 @@ engine/                  BrainEngine本体とコントロール画面
 Preset/                  プロンプトプリセット
 Lorebooks/               Lorebook本体と設定
 SillyTavern-extention/    任意のSillyTavern連携拡張
-start_brainengine.bat     Windows用起動スクリプト
 requirements.txt         Python依存パッケージ
 ```
 
