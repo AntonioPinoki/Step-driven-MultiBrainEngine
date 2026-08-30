@@ -129,6 +129,7 @@ Prompt Studioには、通常の推論チェーンとは独立したSummarization
 ```text
 [[SUMMARIZE]]
 ```
+<img width="477" height="202" alt="image" src="https://github.com/user-attachments/assets/b704585d-34a3-4e1c-8379-5a9d1512e52e" />
 
 返された要約にも同じマーカーが付与されます。履歴に含めることで、その後の応答で過去の文脈として参照できます。
 
