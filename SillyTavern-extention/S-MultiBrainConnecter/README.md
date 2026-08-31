@@ -31,7 +31,7 @@ http://127.0.0.1:8001/api/sillytavern/context
 このフォルダをSillyTavernのユーザー拡張機能フォルダへ配置します。
 
 ```text
-SillyTavern/data/<ユーザー名>/extensions/S-MultiBrainConnecter/
+SillyTavern/data/default-user/extensions/S-MultiBrainConnecter/
 ```
 
 配置後にSillyTavernを再読み込みし、拡張機能パネルの `S-MultiBrainConnecter` を開きます。
