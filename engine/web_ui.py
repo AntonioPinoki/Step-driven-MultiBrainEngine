@@ -83,9 +83,20 @@ def create_ui(server: Any, language: str = "ja"):
         ] + [{"id": "writer", "name": prompts["writer"]["name"], "step": "writer"}]
         return body
 
-    def save_lore_config(payload):
+    def with_lore_agents(body, prompts):
+        body["agents"] = [
+            {"id": item["id"], "name": item["name"], "step": item.get("step")}
+            for item in prompts["steps"]
+        ] + [{"id": "writer", "name": prompts["writer"]["name"], "step": "writer"}]
+        return body
+
+    def save_lore_books(payload):
         prompts = server.active_prompt_setup()
-        return lorebook_store.save_config(payload, prompts)
+        return with_lore_agents(lorebook_store.save_books(payload, prompts), prompts)
+
+    def save_lore_assignments(payload):
+        prompts = server.active_prompt_setup()
+        return with_lore_agents(lorebook_store.save_assignments(payload, prompts), prompts)
 
     def move_lore_target(source_id, destination_id):
         prompts = server.active_prompt_setup()
@@ -191,7 +202,8 @@ def create_ui(server: Any, language: str = "ja"):
 
             with gr.Tab(tr("lorebooks")) as lore_tab:
                 lore_ui = build_lorebooks(
-                    gr, load_config=lore_config, save_config=save_lore_config,
+                    gr, load_config=lore_config, save_books=save_lore_books,
+                    save_assignments=save_lore_assignments,
                     import_book=lorebook_store.import_book_file,
                     delete_book_file=lorebook_store.delete_book_file,
                     move_assignment_target=move_lore_target,

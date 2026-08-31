@@ -59,6 +59,16 @@ def update_entry(draft, book_id, entry_id, **changes):
     return updated
 
 
+def update_book_name(draft, book_id, name):
+    """Return a new draft with the selected lorebook renamed."""
+    updated = _copy(draft or {})
+    book = find_book(updated, book_id)
+    if book is None:
+        raise ValueError("Select a lorebook first")
+    book["name"] = str(name or "").strip() or "Lorebook"
+    return updated
+
+
 def add_book(draft, name="New Lorebook"):
     updated = _copy(draft or {})
     updated.setdefault("books", [])
@@ -139,8 +149,16 @@ def assigned_book_names(draft, book_ids):
     ]
 
 
+def remap_assignments(assignments, book_id_map):
+    """Replace temporary draft book IDs after their first file save."""
+    return {
+        str(agent_id): [book_id_map.get(str(book_id), str(book_id)) for book_id in book_ids]
+        for agent_id, book_ids in (assignments or {}).items()
+    }
+
+
 def build_lorebooks(
-    gr: Any, *, load_config, save_config, import_book, delete_book_file,
+    gr: Any, *, load_config, save_books, save_assignments, import_book, delete_book_file,
     move_assignment_target, remove_assignment_target,
     remove_missing_file_reference, i18n=None,
 ):
@@ -194,7 +212,7 @@ def build_lorebooks(
                 assignment_dropdowns.append(assigned)
                 assignment_summaries.append(summary)
 
-    apply_button = gr.Button(tr("apply_lorebooks"), variant="primary")
+    apply_button = gr.Button(tr("lorebook.save_assignments"), variant="primary")
 
     with gr.Accordion(tr("lorebook.missing_and_errors"), open=False):
         missing_files_text = gr.Markdown("")
@@ -220,7 +238,7 @@ def build_lorebooks(
         add_entry_button = gr.Button(tr("add_entry"))
         delete_entry_button = gr.Button(tr("delete_entry"))
 
-    save_entry_button = gr.Button(tr("update_draft"), variant="primary")
+    save_entry_button = gr.Button(tr("lorebook.save_books"), variant="primary")
     entry_name = gr.Textbox(label=tr("entry_title"))
     content = gr.Textbox(label=tr("content"), lines=10, max_lines=24)
     with gr.Row():
@@ -330,12 +348,15 @@ def build_lorebooks(
             f"**{tr('lorebook.invalid_files')}**\n\n{error_lines}",
         )
 
-    def load_all():
-        body = load_config()
+    def all_values(body, message, preferred_book=None, preferred_entry=None):
         books = book_choices(body)
-        book_id = books[0][1] if books else None
+        available_books = {value for _, value in books}
+        book_id = preferred_book if preferred_book in available_books else (
+            books[0][1] if books else None)
         entries = entry_choices(body, book_id)
-        entry_id = entries[0][1] if entries else None
+        available_entries = {value for _, value in entries}
+        entry_id = preferred_entry if preferred_entry in available_entries else (
+            entries[0][1] if entries else None)
         settings = body.get("settings", {})
         return (
             body, *issue_values(body),
@@ -345,8 +366,11 @@ def build_lorebooks(
             *assignment_control_values(body),
             settings.get("scan_depth", 2), settings.get("token_budget", 2048),
             settings.get("case_sensitive", False), settings.get("match_whole_words", False),
-            settings.get("recursive", False), tr("lorebook.loaded_status"),
+            settings.get("recursive", False), message,
         )
+
+    def load_all():
+        return all_values(load_config(), tr("lorebook.loaded_status"))
 
     def refresh_assignments(body):
         fresh = load_config()
@@ -388,19 +412,33 @@ def build_lorebooks(
     def select_entry(body, book_id, entry_id):
         return entry_values(body, book_id, entry_id)
 
-    def commit(body, book_id, entry_id, bname, *values):
-        updated = _copy(body)
-        selected_book = find_book(updated, book_id)
-        if selected_book is None:
-            raise gr.Error("Select a lorebook first")
-        selected_book["name"] = str(bname or "").strip() or "Lorebook"
-        names = ("name", "content", "keys", "secondary_keys", "enabled", "constant",
-                 "selective", "use_probability", "order", "probability", "scan_depth")
+    def save_book_settings(body, book_id, entry_id, bname, *values):
+        editor_values = values[:11]
+        depth, budget, case, whole, recurse = values[11:]
         try:
-            updated = update_entry(updated, book_id, entry_id, **dict(zip(names, values)))
+            updated = update_book_name(body, book_id, bname)
         except ValueError as exc:
             raise gr.Error(str(exc)) from exc
-        return updated, "Draft updated"
+        if entry_id:
+            names = ("name", "content", "keys", "secondary_keys", "enabled", "constant",
+                     "selective", "use_probability", "order", "probability", "scan_depth")
+            try:
+                updated = update_entry(
+                    updated, book_id, entry_id, **dict(zip(names, editor_values)))
+            except ValueError as exc:
+                raise gr.Error(str(exc)) from exc
+        updated["settings"] = {
+            **updated.get("settings", {}), "scan_depth": int(depth),
+            "token_budget": int(budget), "case_sensitive": bool(case),
+            "match_whole_words": bool(whole), "recursive": bool(recurse),
+        }
+        preserved_assignments = _copy(updated.get("assignments", {}))
+        saved = save_books(updated)
+        book_id_map = saved.pop("book_id_map", {})
+        saved["assignments"] = remap_assignments(preserved_assignments, book_id_map)
+        return all_values(
+            saved, tr("lorebook.books_saved_status"),
+            book_id_map.get(str(book_id), str(book_id)), entry_id)
 
     def create_book(body):
         updated, book_id = add_book(body)
@@ -412,9 +450,10 @@ def build_lorebooks(
         delete_book_file(book_id)
         return load_all()
 
-    def create_entry(body, book_id):
+    def create_entry(body, book_id, bname):
         try:
-            updated, entry_id = add_entry(body, book_id)
+            updated = update_book_name(body, book_id, bname)
+            updated, entry_id = add_entry(updated, book_id)
         except ValueError as exc:
             raise gr.Error(str(exc)) from exc
         return updated, gr.Dropdown(choices=entry_choices(updated, book_id), value=entry_id), *entry_values(updated, book_id, entry_id)
@@ -434,18 +473,19 @@ def build_lorebooks(
             assignments.pop(str(agent_id), None)
         return updated, assignment_summary(updated, book_ids)
 
-    def apply(body, depth, budget, case, whole, recurse, *assignment_values):
+    def save_assignment_settings(body, *assignment_values):
         agent_ids = assignment_values[:MAX_ASSIGNMENT_AGENTS]
         selections = assignment_values[MAX_ASSIGNMENT_AGENTS:]
         updated = update_assignments(body, agent_ids, selections)
-        updated["settings"] = {
-            **updated.get("settings", {}), "scan_depth": int(depth), "token_budget": int(budget),
-            "case_sensitive": bool(case), "match_whole_words": bool(whole), "recursive": bool(recurse),
-        }
-        save_config(updated)
-        values = list(load_all())
-        values[-1] = tr("lorebook.saved_status")
-        return tuple(values)
+        try:
+            saved = save_assignments(updated)
+        except ValueError as exc:
+            message = str(exc)
+            if "Save new lorebooks" in message:
+                message = tr("lorebook.save_books_first")
+            raise gr.Error(message) from exc
+        updated["assignments"] = _copy(saved.get("assignments", {}))
+        return updated, tr("lorebook.assignments_saved_status")
 
     def import_json(path):
         if not path:
@@ -474,8 +514,8 @@ def build_lorebooks(
         remove_missing_file_reference(filename)
         return load_all()
 
-    book.change(select_book, [draft, book], [entry, *editor_outputs], show_progress="hidden")
-    entry.change(select_entry, [draft, book, entry], editor_outputs, show_progress="hidden")
+    book.input(select_book, [draft, book], [entry, *editor_outputs], show_progress="hidden")
+    entry.input(select_entry, [draft, book, entry], editor_outputs, show_progress="hidden")
     assignment_outputs = [
         *assignment_agent_ids, *assignment_rows, *assignment_labels,
         *assignment_dropdowns, *assignment_summaries,
@@ -490,12 +530,16 @@ def build_lorebooks(
     ]
 
     save_entry_event = save_entry_button.click(
-        commit, [draft, book, entry, *editor_outputs], [draft, status])
+        save_book_settings,
+        [draft, book, entry, *editor_outputs, scan_depth, token_budget,
+         case_sensitive, whole_words, recursive],
+        load_outputs)
     add_book_event = add_book_button.click(
         create_book, draft, [draft, book, entry, *editor_outputs])
     delete_book_event = delete_book_button.click(
         remove_book_file, book, load_outputs)
-    add_entry_button.click(create_entry, [draft, book], [draft, entry, *editor_outputs])
+    add_entry_button.click(
+        create_entry, [draft, book, book_name], [draft, entry, *editor_outputs])
     delete_entry_button.click(remove_entry, [draft, book, entry], [draft, entry, *editor_outputs])
     for agent_id, assigned, summary in zip(
         assignment_agent_ids, assignment_dropdowns, assignment_summaries,
@@ -505,10 +549,9 @@ def build_lorebooks(
             show_progress="hidden",
         )
     apply_button.click(
-        apply,
-        [draft, scan_depth, token_budget, case_sensitive, whole_words, recursive,
-         *assignment_agent_ids, *assignment_dropdowns],
-        load_outputs,
+        save_assignment_settings,
+        [draft, *assignment_agent_ids, *assignment_dropdowns],
+        [draft, status],
     )
     import_event = import_file.change(import_json, import_file, load_outputs)
     refresh_event = refresh_button.click(load_all, None, load_outputs)
@@ -519,7 +562,7 @@ def build_lorebooks(
     remove_missing_event = remove_missing_file_button.click(
         remove_missing_reference, missing_file, load_outputs)
 
-    for event in (save_entry_event, add_book_event):
+    for event in (add_book_event,):
         event.then(
             assignment_control_values, draft, assignment_outputs,
             show_progress="hidden",

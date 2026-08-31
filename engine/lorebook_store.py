@@ -647,63 +647,109 @@ def _book_semantics(data, filename):
     return {"name": normalized["name"], "entries": normalized["entries"]}
 
 
-def save_config(raw, prompt_config=None):
-    raw = raw if isinstance(raw, dict) else {}
-    preset_id, preset_name, agents = _prompt_context(prompt_config)
+def _validate_draft_preset(raw, preset_id):
     draft_preset_id = str(raw.get("preset_id") or "").strip()
     if draft_preset_id and draft_preset_id != preset_id:
         raise ValueError(
             "The active prompt preset changed. Reload Lorebooks before saving.")
+
+
+def _save_books_locked(raw, document):
+    document["settings"] = _validate_global_settings(raw.get("settings"))
+    existing = [name for name in os.listdir(BOOKS_DIR) if name.lower().endswith(".json")]
+    remapped = {}
+    for raw_book in raw.get("books") or []:
+        if not isinstance(raw_book, dict):
+            raise ValueError("each lorebook must be an object")
+        original_id = str(raw_book.get("id") or "")
+        supplied = _valid_book_ref(raw_book.get("file") or original_id)
+        filename = supplied or _unique_book_filename(raw_book.get("name"), existing)
+        path = _book_path(filename)
+        if supplied and os.path.isfile(path):
+            if os.path.getsize(path) > MAX_BOOK_BYTES:
+                raise ValueError(f"{filename} is larger than 8 MB")
+            with open(path, "r", encoding="utf-8-sig") as handle:
+                source = json.load(handle)
+            desired = _book_semantics(raw_book, filename)
+            if _book_semantics(source, filename) != desired:
+                _write_json(path, _merge_book_source(source, raw_book, filename))
+        else:
+            _write_json(path, _serialize_book(raw_book, filename))
+        existing.append(filename)
+        if original_id:
+            remapped[original_id] = filename
+    return remapped
+
+
+def _save_assignments_locked(raw, document, preset_id, preset_name, agents, remapped=None):
+    remapped = remapped or {}
+    profile = document["profiles"].setdefault(preset_id, {
+        "last_known_name": preset_name, "assignments": {},
+    })
+    profile["last_known_name"] = preset_name
+    targets = profile.setdefault("assignments", {})
+    selections = raw.get("assignments") if isinstance(raw.get("assignments"), dict) else {}
+    for agent in agents:
+        agent_id = agent["id"]
+        refs = []
+        for value in selections.get(agent_id, []) or []:
+            raw_value = str(value)
+            filename = remapped.get(raw_value) or _valid_book_ref(raw_value)
+            if not filename:
+                raise ValueError(
+                    "Save new lorebooks before saving their assignments.")
+            if filename.casefold() not in {item.casefold() for item in refs}:
+                refs.append(filename)
+        if refs:
+            targets[agent_id] = {
+                "target_name": agent["name"],
+                "target_position": (
+                    agent["step"] if isinstance(agent.get("step"), int) else None),
+                "books": refs,
+            }
+        else:
+            targets.pop(agent_id, None)
+
+
+def save_books(raw, prompt_config=None):
+    """Persist lorebook files and global matching settings, not assignments."""
+    raw = raw if isinstance(raw, dict) else {}
+    preset_id, _, _ = _prompt_context(prompt_config)
+    _validate_draft_preset(raw, preset_id)
     with _lock:
         _ensure_directories()
         document = _load_settings_document()
-        document["settings"] = _validate_global_settings(raw.get("settings"))
-        existing = [name for name in os.listdir(BOOKS_DIR) if name.lower().endswith(".json")]
-        remapped = {}
-        for raw_book in raw.get("books") or []:
-            if not isinstance(raw_book, dict):
-                raise ValueError("each lorebook must be an object")
-            original_id = str(raw_book.get("id") or "")
-            supplied = _valid_book_ref(raw_book.get("file") or original_id)
-            filename = supplied or _unique_book_filename(raw_book.get("name"), existing)
-            path = _book_path(filename)
-            if supplied and os.path.isfile(path):
-                if os.path.getsize(path) > MAX_BOOK_BYTES:
-                    raise ValueError(f"{filename} is larger than 8 MB")
-                with open(path, "r", encoding="utf-8-sig") as handle:
-                    source = json.load(handle)
-                desired = _book_semantics(raw_book, filename)
-                if _book_semantics(source, filename) != desired:
-                    _write_json(
-                        path, _merge_book_source(source, raw_book, filename))
-            else:
-                _write_json(path, _serialize_book(raw_book, filename))
-            existing.append(filename)
-            if original_id:
-                remapped[original_id] = filename
+        remapped = _save_books_locked(raw, document)
+        _write_json(SETTINGS_FILE, validate_settings_document(document))
+    result = load_config(prompt_config)
+    result["book_id_map"] = remapped
+    return result
 
-        profile = document["profiles"].setdefault(preset_id, {
-            "last_known_name": preset_name, "assignments": {},
-        })
-        profile["last_known_name"] = preset_name
-        targets = profile.setdefault("assignments", {})
-        selections = raw.get("assignments") if isinstance(raw.get("assignments"), dict) else {}
-        for agent in agents:
-            agent_id = agent["id"]
-            refs = []
-            for value in selections.get(agent_id, []) or []:
-                filename = remapped.get(str(value)) or _valid_book_ref(value)
-                if filename and filename.casefold() not in {item.casefold() for item in refs}:
-                    refs.append(filename)
-            if refs:
-                targets[agent_id] = {
-                    "target_name": agent["name"],
-                    "target_position": (
-                        agent["step"] if isinstance(agent.get("step"), int) else None),
-                    "books": refs,
-                }
-            else:
-                targets.pop(agent_id, None)
+
+def save_assignments(raw, prompt_config=None):
+    """Persist only the active preset's agent-to-lorebook assignments."""
+    raw = raw if isinstance(raw, dict) else {}
+    preset_id, preset_name, agents = _prompt_context(prompt_config)
+    _validate_draft_preset(raw, preset_id)
+    with _lock:
+        _ensure_directories()
+        document = _load_settings_document()
+        _save_assignments_locked(raw, document, preset_id, preset_name, agents)
+        _write_json(SETTINGS_FILE, validate_settings_document(document))
+    return load_config(prompt_config)
+
+
+def save_config(raw, prompt_config=None):
+    """Persist books, global settings, and assignments for API compatibility."""
+    raw = raw if isinstance(raw, dict) else {}
+    preset_id, preset_name, agents = _prompt_context(prompt_config)
+    _validate_draft_preset(raw, preset_id)
+    with _lock:
+        _ensure_directories()
+        document = _load_settings_document()
+        remapped = _save_books_locked(raw, document)
+        _save_assignments_locked(
+            raw, document, preset_id, preset_name, agents, remapped=remapped)
         _write_json(SETTINGS_FILE, validate_settings_document(document))
     return load_config(prompt_config)
 
